@@ -17,6 +17,7 @@ public class DropDownHandler : MonoBehaviour
         List<string> items = new List<string>();
 
         items.Add("Djikstra VS A*");
+        items.Add("Seek And Flee");
 
         foreach(var item in items)
         {
