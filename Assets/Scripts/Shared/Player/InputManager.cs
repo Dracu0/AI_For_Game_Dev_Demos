@@ -11,7 +11,7 @@ public class InputManager : MonoBehaviour
     private void Awake(){
         _playerInput = GetComponent<PlayerInput>();
 
-        _moveAction = _playerInput.actions.FindAction("Move");
+        _moveAction = _playerInput.actions["Move"];
     }
 
     private void Update(){

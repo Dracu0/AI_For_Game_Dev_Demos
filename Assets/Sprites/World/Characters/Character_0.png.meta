@@ -124,14 +124,14 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 06d7674bfa2145147a673f3202be77c4
+      spriteID: 0b0f95ee7f7e2b24085126f85f9c1056
       internalID: 871103988
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: "Character_0_Down \xAB"
+      name: Character_0_Right
       rect:
         serializedVersion: 2
         x: 16
@@ -146,14 +146,14 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: a5c86d10432332343babb19d5e593f97
+      spriteID: 484c379cbe122e54c9cd474e235def7a
       internalID: 1600342876
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Character_0_Up_Righ
+      name: Character_0_Up_Left
       rect:
         serializedVersion: 2
         x: 32
@@ -168,7 +168,7 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 11bba32e85d4ee3448ce63d66b731632
+      spriteID: 28336523917ad8f4ea5d50db7f28c3de
       internalID: -1535356489
       vertices: []
       indices: 
@@ -190,7 +190,7 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: fe36bcef723a85344bdc139c44a0ca85
+      spriteID: fea61eb505cf3194281e49f590637f5c
       internalID: -1181221564
       vertices: []
       indices: 
@@ -212,7 +212,7 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 5876191007b026d42b32eb8d8565fee9
+      spriteID: db827ea5d3ed0e04a912eb1a2114cf4c
       internalID: 1656938203
       vertices: []
       indices: 
@@ -234,7 +234,7 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 1911ba7410ac7c145a05b137a649df07
+      spriteID: d3dc8a62ccd88604ab15b4b4ac556635
       internalID: 1932054559
       vertices: []
       indices: 
@@ -256,7 +256,7 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 30885426c0d789b478280bdb3b078afa
+      spriteID: 7f019ca2f919a21469936eb07457fc97
       internalID: 1790208059
       vertices: []
       indices: 
@@ -278,7 +278,7 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: 0
       bones: []
-      spriteID: 91d961c06036e1947862a4c9cb44c50e
+      spriteID: 2d67d97bf0e2114489572ac6a084242a
       internalID: -1450523684
       vertices: []
       indices: 
@@ -301,12 +301,12 @@ TextureImporter:
         value: '{"sliceOnImport":false,"gridCellCount":{"x":4.0,"y":2.0},"gridSpriteSize":{"x":16.0,"y":16.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.5},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"pivotUnitMode":0,"slicingType":2,"keepEmptyRects":false,"isAlternate":false}'
     nameFileIdTable:
       Character_0_Down: 1656938203
-      "Character_0_Down \xAB": 1600342876
       Character_0_Down_Left: -1450523684
       Character_0_Down_Right: -1181221564
       Character_0_Left: 1932054559
+      Character_0_Right: 1600342876
       Character_0_Up: 871103988
-      Character_0_Up_Righ: -1535356489
+      Character_0_Up_Left: -1535356489
       Character_0_Up_Right: 1790208059
       D: 1600342876
   mipmapLimitGroupName: 
