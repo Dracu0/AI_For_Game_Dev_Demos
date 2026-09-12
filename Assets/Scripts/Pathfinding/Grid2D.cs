@@ -8,6 +8,7 @@ namespace Pathfinding
     /// Independent of Unity rendering so it can be tested in isolation.
     /// Coordinate convention: index = y * Width + x, (0,0) is the bottom-left.
     /// Movement is 8-directional (cardinals + diagonals) with integer step costs (1 / 2).
+    /// Diagonal steps are allowed through gaps between walls, but not through single-wall corners.
     /// </summary>
     public class Grid2D
     {
@@ -104,8 +105,12 @@ namespace Pathfinding
             if (!IsWalkable(x, y))
                 return;
 
-            // Block corner-cutting through obstacles.
-            if (!IsWalkable(from.x, y) || !IsWalkable(x, from.y))
+            bool cardinalX = IsWalkable(from.x, y);
+            bool cardinalY = IsWalkable(x, from.y);
+
+            // Allow diagonals through gaps where both cardinals are walls.
+            // Block only when exactly one cardinal is blocked (corner-cutting).
+            if (cardinalX != cardinalY)
                 return;
 
             neighbours.Add(new Vector2Int(x, y));
