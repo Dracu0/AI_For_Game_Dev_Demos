@@ -1,7 +1,19 @@
 using UnityEngine;
 
 /// <summary>
-/// Enemy moves toward the player, slows down near them, then stops.
+/// Arrival — reach the player and stop smoothly.
+///
+/// Goal: move toward the player without overshooting.
+///
+/// Outside detection range: stop (idle).
+/// Far but inside detection: full speed toward the player.
+/// Inside slow radius: speed scales down with distance.
+/// Inside stopping distance: stop.
+///
+/// Use when: enemy or NPC should walk up to the player and halt
+/// (guard, shopkeeper, ally).
+///
+/// vs Seek: arrival slows down near the target; seek does not.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class ArrivalEnemy : MonoBehaviour

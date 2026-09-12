@@ -1,7 +1,17 @@
 using UnityEngine;
 
 /// <summary>
-/// Enemy flees from the player at full speed when the player is inside flee range.
+/// Flee — run away from the player at full speed.
+///
+/// Goal: escape the player when they get too close.
+/// Formula: desiredVelocity = directionAwayFromPlayer * maxSpeed
+///
+/// Only active inside flee range. Same steering math as seek, but the
+/// direction is flipped.
+///
+/// Use when: cowardly NPC, scared animal, enemy retreating.
+///
+/// vs Seek: flee moves away from the player, not toward them.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class FleeEnemy : MonoBehaviour

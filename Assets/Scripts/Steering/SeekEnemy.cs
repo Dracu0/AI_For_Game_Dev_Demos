@@ -1,7 +1,19 @@
 using UnityEngine;
 
 /// <summary>
-/// Enemy seeks the player at full speed when inside seek range.
+/// Seek — chase the player's current position at full speed.
+///
+/// Goal: reach the player as fast as possible.
+/// Formula: desiredVelocity = directionToPlayer * maxSpeed
+///
+/// Only active inside seek range. Never slows down, so it may overshoot
+/// or orbit if it gets close.
+///
+/// Use when: simple chaser that does not need to stop neatly (zombie, basic enemy).
+///
+/// vs Pursue: seek aims at where the player is now.
+/// vs Arrival: seek never slows down near the target.
+/// vs Flee: seek moves toward the player, not away.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class SeekEnemy : MonoBehaviour
