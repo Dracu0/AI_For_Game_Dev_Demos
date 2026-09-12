@@ -1,13 +1,18 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// Reads the Player/Move action and stores it for other scripts.
+/// PlayerMovement should be the only script that applies this to a Rigidbody.
+/// </summary>
 public class InputManager : MonoBehaviour
 {
     public static Vector2 Movement { get; private set; }
 
-    [SerializeField] private InputActionAsset inputActions;
+    [SerializeField] InputActionAsset inputActions;
 
-    private InputAction _moveAction;
+    InputActionMap _playerMap;
+    InputAction _moveAction;
 
     void Awake()
     {
@@ -24,8 +29,19 @@ public class InputManager : MonoBehaviour
             return;
         }
 
-        _moveAction = actions.FindAction("Player/Move", true);
-        actions.FindActionMap("Player", true).Enable();
+        _playerMap = actions.FindActionMap("Player", true);
+        _moveAction = _playerMap.FindAction("Move", true);
+    }
+
+    void OnEnable()
+    {
+        _playerMap?.Enable();
+    }
+
+    void OnDisable()
+    {
+        _playerMap?.Disable();
+        Movement = Vector2.zero;
     }
 
     void Update()

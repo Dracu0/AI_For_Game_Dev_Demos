@@ -33,12 +33,12 @@ public class FleeEnemy : MonoBehaviour
     {
         _rb = GetComponent<Rigidbody2D>();
         _rb.gravityScale = 0f;
-        UpdateRangeCircle();
+        SteeringMath.ResizeCircle(fleeRangeCircle, fleeRange);
     }
 
     void OnValidate()
     {
-        UpdateRangeCircle();
+        SteeringMath.ResizeCircle(fleeRangeCircle, fleeRange);
     }
 
     void FixedUpdate()
@@ -48,36 +48,14 @@ public class FleeEnemy : MonoBehaviour
 
         if (Vector2.Distance(_rb.position, player.position) > fleeRange)
         {
-            _rb.linearVelocity = Vector2.zero;
+            SteeringMath.Stop(_rb);
             return;
         }
 
-        Vector2 awayFromPlayer = _rb.position - (Vector2)player.position;
-        if (awayFromPlayer.sqrMagnitude < 0.0001f)
+        Vector2 desiredVelocity = SteeringMath.Direction(player.position, _rb.position) * maxSpeed;
+        if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
             return;
 
-        Vector2 desiredVelocity = awayFromPlayer.normalized * maxSpeed;
-        Vector2 steering = Vector2.ClampMagnitude(
-            desiredVelocity - _rb.linearVelocity,
-            maxForce);
-
-        Vector2 velocity = _rb.linearVelocity + steering * Time.fixedDeltaTime;
-        _rb.linearVelocity = Vector2.ClampMagnitude(velocity, maxSpeed);
-    }
-
-    void UpdateRangeCircle()
-    {
-        if (fleeRangeCircle == null)
-            return;
-
-        SpriteRenderer sprite = fleeRangeCircle.GetComponent<SpriteRenderer>();
-        if (sprite == null || sprite.sprite == null)
-            return;
-
-        float diameter = sprite.sprite.bounds.size.x;
-        if (diameter <= 0f)
-            return;
-
-        fleeRangeCircle.localScale = Vector3.one * (fleeRange * 2f / diameter);
+        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
     }
 }

@@ -1,8 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// Smooth 2D camera follow for the player.
-/// Attach this to the Main Camera and assign the player as the target.
+/// Smooth 2D camera follow.
+/// Attach to Main Camera and assign a target, or leave empty to find "Player".
 /// </summary>
 public class SmoothCameraFollow : MonoBehaviour
 {
@@ -17,15 +17,15 @@ public class SmoothCameraFollow : MonoBehaviour
 
     void Awake()
     {
-        if (target == null)
-        {
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player == null)
-                player = GameObject.Find("Player");
+        if (target != null)
+            return;
 
-            if (player != null)
-                target = player.transform;
-        }
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player == null)
+            player = GameObject.Find("Player");
+
+        if (player != null)
+            target = player.transform;
     }
 
     void LateUpdate()

@@ -1,7 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// Simple steering agent used by the Seek vs Flee demo.
+/// Simple agent used by the Seek vs Flee demo.
+/// Applies seek or flee using transform movement instead of a Rigidbody2D.
 /// </summary>
 public class SteeringAgent : MonoBehaviour
 {
@@ -23,28 +24,17 @@ public class SteeringAgent : MonoBehaviour
 
     public void SeekToward(Vector2 target)
     {
-        Vector2 toTarget = target - (Vector2)transform.position;
-        if (toTarget.sqrMagnitude < 0.0001f)
-            return;
-
-        Vector2 desiredVelocity = toTarget.normalized * maxSpeed;
-        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - _velocity, maxForce);
-        ApplySteering(steering);
+        Apply(SteeringMath.Direction(transform.position, target) * maxSpeed);
     }
 
     public void FleeFrom(Vector2 threat)
     {
-        Vector2 awayFromThreat = (Vector2)transform.position - threat;
-        if (awayFromThreat.sqrMagnitude < 0.0001f)
-            return;
-
-        Vector2 desiredVelocity = awayFromThreat.normalized * maxSpeed;
-        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - _velocity, maxForce);
-        ApplySteering(steering);
+        Apply(SteeringMath.Direction(threat, transform.position) * maxSpeed);
     }
 
-    void ApplySteering(Vector2 steering)
+    void Apply(Vector2 desiredVelocity)
     {
+        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - _velocity, maxForce);
         _velocity += steering * Time.deltaTime;
         _velocity = Vector2.ClampMagnitude(_velocity, maxSpeed);
         transform.position += (Vector3)(_velocity * Time.deltaTime);

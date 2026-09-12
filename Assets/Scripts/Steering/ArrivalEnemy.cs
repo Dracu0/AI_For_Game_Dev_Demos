@@ -54,56 +54,31 @@ public class ArrivalEnemy : MonoBehaviour
             return;
 
         float distance = Vector2.Distance(_rb.position, player.position);
-
         if (distance > detectionRange)
         {
-            _rb.linearVelocity = Vector2.zero;
+            SteeringMath.Stop(_rb);
             return;
         }
 
-        Vector2 toPlayer = (Vector2)player.position - _rb.position;
+        Vector2 desiredVelocity = GetDesiredVelocity(distance);
+        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
+    }
 
-        Vector2 desiredVelocity;
+    Vector2 GetDesiredVelocity(float distance)
+    {
         if (distance < stoppingDistance)
-        {
-            desiredVelocity = Vector2.zero;
-        }
-        else if (distance < slowRadius)
-        {
-            desiredVelocity = toPlayer / distance * (maxSpeed * (distance / slowRadius));
-        }
-        else
-        {
-            desiredVelocity = toPlayer / distance * maxSpeed;
-        }
+            return Vector2.zero;
 
-        Vector2 steering = Vector2.ClampMagnitude(
-            desiredVelocity - _rb.linearVelocity,
-            maxForce);
+        Vector2 direction = SteeringMath.Direction(_rb.position, player.position);
+        if (distance < slowRadius)
+            return direction * (maxSpeed * (distance / slowRadius));
 
-        Vector2 velocity = _rb.linearVelocity + steering * Time.fixedDeltaTime;
-        _rb.linearVelocity = Vector2.ClampMagnitude(velocity, maxSpeed);
+        return direction * maxSpeed;
     }
 
     void UpdateRangeCircles()
     {
-        ResizeCircle(detectionRangeCircle, detectionRange);
-        ResizeCircle(slowRadiusCircle, slowRadius);
-    }
-
-    void ResizeCircle(Transform circle, float radius)
-    {
-        if (circle == null)
-            return;
-
-        SpriteRenderer sprite = circle.GetComponent<SpriteRenderer>();
-        if (sprite == null || sprite.sprite == null)
-            return;
-
-        float diameter = sprite.sprite.bounds.size.x;
-        if (diameter <= 0f)
-            return;
-
-        circle.localScale = Vector3.one * (radius * 2f / diameter);
+        SteeringMath.ResizeCircle(detectionRangeCircle, detectionRange);
+        SteeringMath.ResizeCircle(slowRadiusCircle, slowRadius);
     }
 }

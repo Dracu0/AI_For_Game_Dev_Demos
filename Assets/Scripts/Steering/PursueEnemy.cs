@@ -36,7 +36,7 @@ public class PursueEnemy : MonoBehaviour
     {
         _rb = GetComponent<Rigidbody2D>();
         _rb.gravityScale = 0f;
-        UpdateRangeCircle();
+        SteeringMath.ResizeCircle(pursueRangeCircle, pursueRange);
     }
 
     void Start()
@@ -47,7 +47,7 @@ public class PursueEnemy : MonoBehaviour
 
     void OnValidate()
     {
-        UpdateRangeCircle();
+        SteeringMath.ResizeCircle(pursueRangeCircle, pursueRange);
     }
 
     void FixedUpdate()
@@ -57,22 +57,16 @@ public class PursueEnemy : MonoBehaviour
 
         if (Vector2.Distance(_rb.position, player.position) > pursueRange)
         {
-            _rb.linearVelocity = Vector2.zero;
+            SteeringMath.Stop(_rb);
             return;
         }
 
-        Vector2 targetPosition = GetPredictedPlayerPosition();
-        Vector2 toTarget = targetPosition - _rb.position;
-        if (toTarget.sqrMagnitude < 0.0001f)
+        Vector2 predictedPosition = GetPredictedPlayerPosition();
+        Vector2 desiredVelocity = SteeringMath.Direction(_rb.position, predictedPosition) * maxSpeed;
+        if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
             return;
 
-        Vector2 desiredVelocity = toTarget.normalized * maxSpeed;
-        Vector2 steering = Vector2.ClampMagnitude(
-            desiredVelocity - _rb.linearVelocity,
-            maxForce);
-
-        Vector2 velocity = _rb.linearVelocity + steering * Time.fixedDeltaTime;
-        _rb.linearVelocity = Vector2.ClampMagnitude(velocity, maxSpeed);
+        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
     }
 
     Vector2 GetPredictedPlayerPosition()
@@ -81,26 +75,8 @@ public class PursueEnemy : MonoBehaviour
         if (_playerRb == null)
             return playerPosition;
 
-        Vector2 toPlayer = playerPosition - _rb.position;
-        float distance = toPlayer.magnitude;
+        float distance = Vector2.Distance(_rb.position, playerPosition);
         float lookAheadTime = distance / maxSpeed;
-
         return playerPosition + _playerRb.linearVelocity * lookAheadTime;
-    }
-
-    void UpdateRangeCircle()
-    {
-        if (pursueRangeCircle == null)
-            return;
-
-        SpriteRenderer sprite = pursueRangeCircle.GetComponent<SpriteRenderer>();
-        if (sprite == null || sprite.sprite == null)
-            return;
-
-        float diameter = sprite.sprite.bounds.size.x;
-        if (diameter <= 0f)
-            return;
-
-        pursueRangeCircle.localScale = Vector3.one * (pursueRange * 2f / diameter);
     }
 }

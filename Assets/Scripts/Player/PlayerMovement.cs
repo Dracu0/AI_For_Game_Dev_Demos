@@ -1,21 +1,29 @@
 using UnityEngine;
 
+/// <summary>
+/// Applies InputManager.Movement to this object's Rigidbody2D.
+/// Reads input in Update, then moves in FixedUpdate.
+/// </summary>
+[RequireComponent(typeof(Rigidbody2D))]
 public class PlayerMovement : MonoBehaviour
 {
-   [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] float moveSpeed = 5f;
 
-   private Vector2 _movement;
+    Rigidbody2D _rb;
+    Vector2 _movement;
 
-   private Rigidbody2D _rb;
+    void Awake()
+    {
+        _rb = GetComponent<Rigidbody2D>();
+    }
 
-   private void Awake(){
-    _rb = GetComponent<Rigidbody2D>();
-   }
+    void Update()
+    {
+        _movement = InputManager.Movement;
+    }
 
-   private void Update(){
-    _movement.Set(InputManager.Movement.x, InputManager.Movement.y);
-
-    //_rb.velocity = _movement.normalized * moveSpeed;
-    _rb.linearVelocity = _movement * moveSpeed;
-   }
+    void FixedUpdate()
+    {
+        _rb.linearVelocity = _movement * moveSpeed;
+    }
 }

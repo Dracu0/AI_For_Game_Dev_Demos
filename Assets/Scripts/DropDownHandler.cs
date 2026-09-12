@@ -1,37 +1,39 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 
-using TMPro;
-
+/// <summary>
+/// Fills a TMP dropdown with demo names and copies the selected name to a label.
+/// </summary>
 public class DropDownHandler : MonoBehaviour
 {
+    [SerializeField] TextMeshProUGUI TextBox;
 
-    [SerializeField] private TextMeshProUGUI TextBox;
+    static readonly string[] DemoNames =
+    {
+        "Dijkstra VS A*",
+        "Seek And Flee"
+    };
 
     void Start()
     {
-        var dropdown = GetComponent<TMP_Dropdown>();
+        TMP_Dropdown dropdown = GetComponent<TMP_Dropdown>();
+        if (dropdown == null)
+            return;
 
         dropdown.options.Clear();
+        foreach (string name in DemoNames)
+            dropdown.options.Add(new TMP_Dropdown.OptionData(name));
 
-        List<string> items = new List<string>();
-
-        items.Add("Djikstra VS A*");
-        items.Add("Seek And Flee");
-
-        foreach(var item in items)
-        {
-            dropdown.options.Add(new TMP_Dropdown.OptionData() { text = item});
-        }
-
-        DropdownItemSelected(dropdown);
-        dropdown.onValueChanged.AddListener(delegate { DropdownItemSelected(dropdown); });
+        dropdown.onValueChanged.AddListener(_ => ShowSelected(dropdown));
+        ShowSelected(dropdown);
     }
 
-    void DropdownItemSelected(TMP_Dropdown dropdown)
+    void ShowSelected(TMP_Dropdown dropdown)
     {
-        int index = dropdown.value;
+        if (TextBox == null || dropdown.options.Count == 0)
+            return;
 
-        TextBox.text = dropdown.options[index].text; 
+        TextBox.text = dropdown.options[dropdown.value].text;
     }
 }

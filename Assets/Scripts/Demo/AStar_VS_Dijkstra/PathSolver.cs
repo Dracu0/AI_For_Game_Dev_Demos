@@ -26,9 +26,10 @@ namespace Pathfinding
     }
 
     /// <summary>
+    /// Teaching-friendly pathfinding.
     /// Read RunDijkstra first, then RunAStar.
-    /// Both algorithms use the same grid, neighbour rules, and path reconstruction.
-    /// The key difference is what value the priority queue uses to pick the next cell.
+    /// Both use the same grid, neighbour rules, and path reconstruction.
+    /// The only difference is the priority used to pick the next cell.
     /// </summary>
     public static class PathSolver
     {

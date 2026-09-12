@@ -4,7 +4,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Side-by-side Seek vs Flee demo using the shared steering behaviours.
+/// Side-by-side Seek vs Flee demo.
 ///
 /// Controls:
 ///   LMB - move the target / threat
@@ -12,10 +12,6 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class SeekAndFleeDemo : MonoBehaviour
 {
-    // ------------------------------------------------------------------
-    // Inspector settings
-    // ------------------------------------------------------------------
-
     [Header("Scene")]
     [SerializeField] GameObject spritePrefab;
 
@@ -36,23 +32,14 @@ public class SeekAndFleeDemo : MonoBehaviour
     [Header("UI (optional)")]
     [SerializeField] TMP_Text statusText;
 
-    // ------------------------------------------------------------------
-    // Runtime state
-    // ------------------------------------------------------------------
-
     SteeringAgent _seeker;
     SteeringAgent _fleer;
     Transform _target;
     Camera _camera;
 
-    // ------------------------------------------------------------------
-    // Unity lifecycle
-    // ------------------------------------------------------------------
-
     void Awake()
     {
         _camera = Camera.main;
-
         if (!ValidateSetup())
             return;
 
@@ -73,32 +60,23 @@ public class SeekAndFleeDemo : MonoBehaviour
         if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
             ResetAgents();
 
-        if (IsPointerOverUI())
-            return;
-
-        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        if (!IsPointerOverUI() &&
+            Mouse.current != null &&
+            Mouse.current.leftButton.wasPressedThisFrame)
+        {
             TryMoveTarget();
+        }
 
         Vector2 targetPosition = _target.position;
         _seeker.SeekToward(targetPosition);
         _fleer.FleeFrom(targetPosition);
     }
 
-    // ------------------------------------------------------------------
-    // Scene setup
-    // ------------------------------------------------------------------
-
     bool ValidateSetup()
     {
-        if (spritePrefab == null)
+        if (spritePrefab == null || spritePrefab.GetComponent<SpriteRenderer>() == null)
         {
-            Debug.LogError("SeekAndFleeDemo: assign the sprite prefab.");
-            return false;
-        }
-
-        if (spritePrefab.GetComponent<SpriteRenderer>() == null)
-        {
-            Debug.LogError("SeekAndFleeDemo: the sprite prefab needs a SpriteRenderer.");
+            Debug.LogError("SeekAndFleeDemo: assign a sprite prefab with a SpriteRenderer.");
             return false;
         }
 
@@ -124,10 +102,7 @@ public class SeekAndFleeDemo : MonoBehaviour
 
     SteeringAgent CreateAgent(string agentName, Vector2 spawnPosition, Color color)
     {
-        GameObject instance = Instantiate(spritePrefab, spawnPosition, Quaternion.identity, transform);
-        instance.name = agentName;
-        instance.GetComponent<SpriteRenderer>().color = color;
-
+        GameObject instance = CreateSprite(agentName, spawnPosition, color);
         SteeringAgent agent = instance.AddComponent<SteeringAgent>();
         agent.Configure(maxSpeed, maxForce);
         agent.ResetMotion();
@@ -136,10 +111,15 @@ public class SeekAndFleeDemo : MonoBehaviour
 
     Transform CreateMarker(string markerName, Vector2 spawnPosition, Color color)
     {
+        return CreateSprite(markerName, spawnPosition, color).transform;
+    }
+
+    GameObject CreateSprite(string objectName, Vector2 spawnPosition, Color color)
+    {
         GameObject instance = Instantiate(spritePrefab, spawnPosition, Quaternion.identity, transform);
-        instance.name = markerName;
+        instance.name = objectName;
         instance.GetComponent<SpriteRenderer>().color = color;
-        return instance.transform;
+        return instance;
     }
 
     void FrameCamera()
@@ -151,10 +131,6 @@ public class SeekAndFleeDemo : MonoBehaviour
         _camera.transform.position = new Vector3(0f, 0f, -10f);
         _camera.orthographicSize = 6f;
     }
-
-    // ------------------------------------------------------------------
-    // Input
-    // ------------------------------------------------------------------
 
     void TryMoveTarget()
     {
@@ -178,10 +154,6 @@ public class SeekAndFleeDemo : MonoBehaviour
 
     static bool IsPointerOverUI() =>
         EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-
-    // ------------------------------------------------------------------
-    // UI
-    // ------------------------------------------------------------------
 
     void SetStatus(string message)
     {

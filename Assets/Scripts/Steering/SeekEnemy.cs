@@ -35,12 +35,12 @@ public class SeekEnemy : MonoBehaviour
     {
         _rb = GetComponent<Rigidbody2D>();
         _rb.gravityScale = 0f;
-        UpdateRangeCircle();
+        SteeringMath.ResizeCircle(seekRangeCircle, seekRange);
     }
 
     void OnValidate()
     {
-        UpdateRangeCircle();
+        SteeringMath.ResizeCircle(seekRangeCircle, seekRange);
     }
 
     void FixedUpdate()
@@ -50,36 +50,14 @@ public class SeekEnemy : MonoBehaviour
 
         if (Vector2.Distance(_rb.position, player.position) > seekRange)
         {
-            _rb.linearVelocity = Vector2.zero;
+            SteeringMath.Stop(_rb);
             return;
         }
 
-        Vector2 toPlayer = (Vector2)player.position - _rb.position;
-        if (toPlayer.sqrMagnitude < 0.0001f)
+        Vector2 desiredVelocity = SteeringMath.Direction(_rb.position, player.position) * maxSpeed;
+        if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
             return;
 
-        Vector2 desiredVelocity = toPlayer.normalized * maxSpeed;
-        Vector2 steering = Vector2.ClampMagnitude(
-            desiredVelocity - _rb.linearVelocity,
-            maxForce);
-
-        Vector2 velocity = _rb.linearVelocity + steering * Time.fixedDeltaTime;
-        _rb.linearVelocity = Vector2.ClampMagnitude(velocity, maxSpeed);
-    }
-
-    void UpdateRangeCircle()
-    {
-        if (seekRangeCircle == null)
-            return;
-
-        SpriteRenderer sprite = seekRangeCircle.GetComponent<SpriteRenderer>();
-        if (sprite == null || sprite.sprite == null)
-            return;
-
-        float diameter = sprite.sprite.bounds.size.x;
-        if (diameter <= 0f)
-            return;
-
-        seekRangeCircle.localScale = Vector3.one * (seekRange * 2f / diameter);
+        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
     }
 }
