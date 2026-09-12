@@ -7,7 +7,7 @@ namespace Steering
     /// desired velocity = (target - position).normalized * maxSpeed
     /// steering force   = desired velocity - current velocity
     /// </summary>
-    public static class Seek
+    public static class SeekBehaviour
     {
         public static Vector2 Calculate(
             Vector2 position,
