@@ -1,58 +1,52 @@
 using UnityEngine;
 
-namespace Steering
+/// <summary>
+/// Simple steering agent used by the Seek vs Flee demo.
+/// </summary>
+public class SteeringAgent : MonoBehaviour
 {
-    /// <summary>
-    /// Reusable agent that stores velocity and applies steering forces each frame.
-    /// Used by Seek, Flee, and future steering demos.
-    /// </summary>
-    public class SteeringAgent : MonoBehaviour
+    [SerializeField] float maxSpeed = 4f;
+    [SerializeField] float maxForce = 8f;
+
+    Vector2 _velocity;
+
+    public void Configure(float speed, float force)
     {
-        [SerializeField] float maxSpeed = 4f;
-        [SerializeField] float maxForce = 8f;
+        maxSpeed = speed;
+        maxForce = force;
+    }
 
-        Vector2 _velocity;
+    public void ResetMotion()
+    {
+        _velocity = Vector2.zero;
+    }
 
-        public Vector2 Position => transform.position;
-        public Vector2 Velocity => _velocity;
-        public float MaxSpeed => maxSpeed;
-        public float MaxForce => maxForce;
+    public void SeekToward(Vector2 target)
+    {
+        Vector2 toTarget = target - (Vector2)transform.position;
+        if (toTarget.sqrMagnitude < 0.0001f)
+            return;
 
-        public void Configure(float speed, float force)
-        {
-            maxSpeed = speed;
-            maxForce = force;
-        }
+        Vector2 desiredVelocity = toTarget.normalized * maxSpeed;
+        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - _velocity, maxForce);
+        ApplySteering(steering);
+    }
 
-        public void ResetMotion()
-        {
-            _velocity = Vector2.zero;
-        }
+    public void FleeFrom(Vector2 threat)
+    {
+        Vector2 awayFromThreat = (Vector2)transform.position - threat;
+        if (awayFromThreat.sqrMagnitude < 0.0001f)
+            return;
 
-        public void SeekToward(Vector2 target)
-        {
-            ApplySteering(Seek.Calculate(Position, _velocity, target, maxSpeed, maxForce));
-        }
+        Vector2 desiredVelocity = awayFromThreat.normalized * maxSpeed;
+        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - _velocity, maxForce);
+        ApplySteering(steering);
+    }
 
-        public void FleeFrom(Vector2 threat)
-        {
-            ApplySteering(Flee.Calculate(Position, _velocity, threat, maxSpeed, maxForce));
-        }
-
-        void ApplySteering(Vector2 steeringForce)
-        {
-            _velocity += steeringForce * Time.deltaTime;
-            _velocity = Vector2.ClampMagnitude(_velocity, maxSpeed);
-            transform.position += (Vector3)(_velocity * Time.deltaTime);
-        }
-
-        void OnDrawGizmos()
-        {
-            if (!Application.isPlaying)
-                return;
-
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawRay(transform.position, _velocity);
-        }
+    void ApplySteering(Vector2 steering)
+    {
+        _velocity += steering * Time.deltaTime;
+        _velocity = Vector2.ClampMagnitude(_velocity, maxSpeed);
+        transform.position += (Vector3)(_velocity * Time.deltaTime);
     }
 }

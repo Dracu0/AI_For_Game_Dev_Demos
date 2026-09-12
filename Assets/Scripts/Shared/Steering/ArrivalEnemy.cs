@@ -1,17 +1,18 @@
 using UnityEngine;
 
 /// <summary>
-/// Enemy seeks the player at full speed when inside seek range.
+/// Enemy moves toward the player, slows down near them, then stops.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
-public class SeekEnemy : MonoBehaviour
+public class ArrivalEnemy : MonoBehaviour
 {
     [Header("Target")]
     [SerializeField] Transform player;
 
-    [Header("Seek Range")]
-    [SerializeField] Transform seekRangeCircle;
-    [SerializeField] float seekRange = 5f;
+    [Header("Arrival")]
+    [SerializeField] Transform slowRadiusCircle;
+    [SerializeField] float slowRadius = 3f;
+    [SerializeField] float stoppingDistance = 0.25f;
 
     [Header("Movement")]
     [SerializeField] float maxSpeed = 3f;
@@ -36,17 +37,23 @@ public class SeekEnemy : MonoBehaviour
         if (player == null)
             return;
 
-        if (Vector2.Distance(_rb.position, player.position) > seekRange)
+        Vector2 toPlayer = (Vector2)player.position - _rb.position;
+        float distance = toPlayer.magnitude;
+
+        Vector2 desiredVelocity;
+        if (distance < stoppingDistance)
         {
-            _rb.linearVelocity = Vector2.zero;
-            return;
+            desiredVelocity = Vector2.zero;
+        }
+        else if (distance < slowRadius)
+        {
+            desiredVelocity = toPlayer / distance * (maxSpeed * (distance / slowRadius));
+        }
+        else
+        {
+            desiredVelocity = toPlayer / distance * maxSpeed;
         }
 
-        Vector2 toPlayer = (Vector2)player.position - _rb.position;
-        if (toPlayer.sqrMagnitude < 0.0001f)
-            return;
-
-        Vector2 desiredVelocity = toPlayer.normalized * maxSpeed;
         Vector2 steering = Vector2.ClampMagnitude(
             desiredVelocity - _rb.linearVelocity,
             maxForce);
@@ -57,10 +64,10 @@ public class SeekEnemy : MonoBehaviour
 
     void UpdateRangeCircle()
     {
-        if (seekRangeCircle == null)
+        if (slowRadiusCircle == null)
             return;
 
-        SpriteRenderer sprite = seekRangeCircle.GetComponent<SpriteRenderer>();
+        SpriteRenderer sprite = slowRadiusCircle.GetComponent<SpriteRenderer>();
         if (sprite == null || sprite.sprite == null)
             return;
 
@@ -68,6 +75,6 @@ public class SeekEnemy : MonoBehaviour
         if (diameter <= 0f)
             return;
 
-        seekRangeCircle.localScale = Vector3.one * (seekRange * 2f / diameter);
+        slowRadiusCircle.localScale = Vector3.one * (slowRadius * 2f / diameter);
     }
 }
