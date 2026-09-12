@@ -777,7 +777,7 @@ MonoBehaviour:
   visitedColor: {r: 0.2, g: 0.5, b: 1, a: 1}
   pathColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   statusText: {fileID: 646264745}
-  stepDelay: 0.01
+  stepDelay: 0.005
 --- !u!4 &1518398509
 Transform:
   m_ObjectHideFlags: 0
