@@ -9,6 +9,10 @@ public class ArrivalEnemy : MonoBehaviour
     [Header("Target")]
     [SerializeField] Transform player;
 
+    [Header("Detection")]
+    [SerializeField] Transform detectionRangeCircle;
+    [SerializeField] float detectionRange = 5f;
+
     [Header("Arrival")]
     [SerializeField] Transform slowRadiusCircle;
     [SerializeField] float slowRadius = 3f;
@@ -24,12 +28,12 @@ public class ArrivalEnemy : MonoBehaviour
     {
         _rb = GetComponent<Rigidbody2D>();
         _rb.gravityScale = 0f;
-        UpdateRangeCircle();
+        UpdateRangeCircles();
     }
 
     void OnValidate()
     {
-        UpdateRangeCircle();
+        UpdateRangeCircles();
     }
 
     void FixedUpdate()
@@ -37,8 +41,15 @@ public class ArrivalEnemy : MonoBehaviour
         if (player == null)
             return;
 
+        float distance = Vector2.Distance(_rb.position, player.position);
+
+        if (distance > detectionRange)
+        {
+            _rb.linearVelocity = Vector2.zero;
+            return;
+        }
+
         Vector2 toPlayer = (Vector2)player.position - _rb.position;
-        float distance = toPlayer.magnitude;
 
         Vector2 desiredVelocity;
         if (distance < stoppingDistance)
@@ -62,12 +73,18 @@ public class ArrivalEnemy : MonoBehaviour
         _rb.linearVelocity = Vector2.ClampMagnitude(velocity, maxSpeed);
     }
 
-    void UpdateRangeCircle()
+    void UpdateRangeCircles()
     {
-        if (slowRadiusCircle == null)
+        ResizeCircle(detectionRangeCircle, detectionRange);
+        ResizeCircle(slowRadiusCircle, slowRadius);
+    }
+
+    void ResizeCircle(Transform circle, float radius)
+    {
+        if (circle == null)
             return;
 
-        SpriteRenderer sprite = slowRadiusCircle.GetComponent<SpriteRenderer>();
+        SpriteRenderer sprite = circle.GetComponent<SpriteRenderer>();
         if (sprite == null || sprite.sprite == null)
             return;
 
@@ -75,6 +92,6 @@ public class ArrivalEnemy : MonoBehaviour
         if (diameter <= 0f)
             return;
 
-        slowRadiusCircle.localScale = Vector3.one * (slowRadius * 2f / diameter);
+        circle.localScale = Vector3.one * (radius * 2f / diameter);
     }
 }
