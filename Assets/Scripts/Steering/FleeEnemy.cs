@@ -32,7 +32,7 @@ public class FleeEnemy : MonoBehaviour
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
-        _rb.gravityScale = 0f;
+        SteeringMath.SetupEnemy(_rb);
         SteeringMath.ResizeCircle(fleeRangeCircle, fleeRange);
     }
 
@@ -46,16 +46,16 @@ public class FleeEnemy : MonoBehaviour
         if (player == null)
             return;
 
-        if (Vector2.Distance(_rb.position, player.position) > fleeRange)
+        if (SteeringMath.IsOutOfRange(_rb.position, player.position, fleeRange))
         {
             SteeringMath.Stop(_rb);
             return;
         }
 
-        Vector2 desiredVelocity = SteeringMath.Direction(player.position, _rb.position) * maxSpeed;
-        if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
-            return;
-
-        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
+        SteeringMath.SteerIfMoving(
+            _rb,
+            SteeringMath.FleeVelocity(_rb.position, player.position, maxSpeed),
+            maxForce,
+            maxSpeed);
     }
 }

@@ -34,6 +34,6 @@ public class DropDownHandler : MonoBehaviour
         if (TextBox == null || dropdown.options.Count == 0)
             return;
 
-        TextBox.text = dropdown.options[dropdown.value].text;
+        DemoInput.SetStatus(TextBox, dropdown.options[dropdown.value].text);
     }
 }

@@ -25,12 +25,12 @@ public class SteeringAgent : MonoBehaviour
 
     public void SeekToward(Vector2 target)
     {
-        Apply(SteeringMath.Direction(transform.position, target) * maxSpeed);
+        Apply(SteeringMath.SeekVelocity(transform.position, target, maxSpeed));
     }
 
     public void FleeFrom(Vector2 threat)
     {
-        Apply(SteeringMath.Direction(threat, transform.position) * maxSpeed);
+        Apply(SteeringMath.FleeVelocity(transform.position, threat, maxSpeed));
     }
 
     void Apply(Vector2 desiredVelocity)

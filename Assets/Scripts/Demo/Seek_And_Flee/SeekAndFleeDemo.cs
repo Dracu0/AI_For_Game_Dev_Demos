@@ -1,6 +1,5 @@
 using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -60,7 +59,7 @@ public class SeekAndFleeDemo : MonoBehaviour
         if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
             ResetAgents();
 
-        if (!IsPointerOverUI() &&
+        if (!DemoInput.IsPointerOverUI() &&
             Mouse.current != null &&
             Mouse.current.leftButton.wasPressedThisFrame)
         {
@@ -135,12 +134,9 @@ public class SeekAndFleeDemo : MonoBehaviour
 
     void TryMoveTarget()
     {
-        if (_camera == null || Mouse.current == null)
+        if (!DemoInput.TryGetMouseWorldPosition(_camera, out Vector3 world))
             return;
 
-        Vector2 screen = Mouse.current.position.ReadValue();
-        float depth = Mathf.Abs(_camera.transform.position.z);
-        Vector3 world = _camera.ScreenToWorldPoint(new Vector3(screen.x, screen.y, depth));
         _target.position = new Vector3(world.x, world.y, 0f);
     }
 
@@ -153,12 +149,5 @@ public class SeekAndFleeDemo : MonoBehaviour
         SetStatus("Agents reset. LMB: move target.");
     }
 
-    static bool IsPointerOverUI() =>
-        EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-
-    void SetStatus(string message)
-    {
-        if (statusText != null)
-            statusText.text = message;
-    }
+    void SetStatus(string message) => DemoInput.SetStatus(statusText, message);
 }

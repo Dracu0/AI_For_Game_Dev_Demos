@@ -34,7 +34,7 @@ public class SeekEnemy : MonoBehaviour
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
-        _rb.gravityScale = 0f;
+        SteeringMath.SetupEnemy(_rb);
         SteeringMath.ResizeCircle(seekRangeCircle, seekRange);
     }
 
@@ -48,16 +48,16 @@ public class SeekEnemy : MonoBehaviour
         if (player == null)
             return;
 
-        if (Vector2.Distance(_rb.position, player.position) > seekRange)
+        if (SteeringMath.IsOutOfRange(_rb.position, player.position, seekRange))
         {
             SteeringMath.Stop(_rb);
             return;
         }
 
-        Vector2 desiredVelocity = SteeringMath.Direction(_rb.position, player.position) * maxSpeed;
-        if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
-            return;
-
-        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
+        SteeringMath.SteerIfMoving(
+            _rb,
+            SteeringMath.SeekVelocity(_rb.position, player.position, maxSpeed),
+            maxForce,
+            maxSpeed);
     }
 }

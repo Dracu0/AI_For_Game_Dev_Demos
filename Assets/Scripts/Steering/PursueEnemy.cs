@@ -35,7 +35,7 @@ public class PursueEnemy : MonoBehaviour
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
-        _rb.gravityScale = 0f;
+        SteeringMath.SetupEnemy(_rb);
         SteeringMath.ResizeCircle(pursueRangeCircle, pursueRange);
     }
 
@@ -55,28 +55,23 @@ public class PursueEnemy : MonoBehaviour
         if (player == null)
             return;
 
-        if (Vector2.Distance(_rb.position, player.position) > pursueRange)
+        if (SteeringMath.IsOutOfRange(_rb.position, player.position, pursueRange))
         {
             SteeringMath.Stop(_rb);
             return;
         }
 
-        Vector2 predictedPosition = GetPredictedPlayerPosition();
-        Vector2 desiredVelocity = SteeringMath.Direction(_rb.position, predictedPosition) * maxSpeed;
-        if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
-            return;
+        Vector2 targetVelocity = _playerRb != null ? _playerRb.linearVelocity : Vector2.zero;
+        Vector2 predictedPosition = SteeringMath.PredictPosition(
+            _rb.position,
+            player.position,
+            targetVelocity,
+            maxSpeed);
 
-        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
-    }
-
-    Vector2 GetPredictedPlayerPosition()
-    {
-        Vector2 playerPosition = player.position;
-        if (_playerRb == null)
-            return playerPosition;
-
-        float distance = Vector2.Distance(_rb.position, playerPosition);
-        float lookAheadTime = distance / maxSpeed;
-        return playerPosition + _playerRb.linearVelocity * lookAheadTime;
+        SteeringMath.SteerIfMoving(
+            _rb,
+            SteeringMath.SeekVelocity(_rb.position, predictedPosition, maxSpeed),
+            maxForce,
+            maxSpeed);
     }
 }

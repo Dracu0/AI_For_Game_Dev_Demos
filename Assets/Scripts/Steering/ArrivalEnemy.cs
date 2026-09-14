@@ -39,7 +39,7 @@ public class ArrivalEnemy : MonoBehaviour
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
-        _rb.gravityScale = 0f;
+        SteeringMath.SetupEnemy(_rb);
         UpdateRangeCircles();
     }
 
@@ -54,26 +54,20 @@ public class ArrivalEnemy : MonoBehaviour
             return;
 
         float distance = Vector2.Distance(_rb.position, player.position);
-        if (distance > detectionRange)
+        if (SteeringMath.IsOutOfRange(_rb.position, player.position, detectionRange))
         {
             SteeringMath.Stop(_rb);
             return;
         }
 
-        Vector2 desiredVelocity = GetDesiredVelocity(distance);
+        Vector2 desiredVelocity = SteeringMath.ArrivalVelocity(
+            _rb.position,
+            player.position,
+            distance,
+            maxSpeed,
+            slowRadius,
+            stoppingDistance);
         _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
-    }
-
-    Vector2 GetDesiredVelocity(float distance)
-    {
-        if (distance < stoppingDistance)
-            return Vector2.zero;
-
-        Vector2 direction = SteeringMath.Direction(_rb.position, player.position);
-        if (distance < slowRadius)
-            return direction * (maxSpeed * (distance / slowRadius));
-
-        return direction * maxSpeed;
     }
 
     void UpdateRangeCircles()
