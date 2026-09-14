@@ -1,19 +1,20 @@
 using System.Collections.Generic;
+using System.IO;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEditor.Build.Profile;
+#endif
 
 /// <summary>
-/// Fills a TMP dropdown with demo names and copies the selected name to a label.
+/// Fills a TMP dropdown with scene names from the active build profile, in build order.
 /// </summary>
 public class DropDownHandler : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI TextBox;
-
-    static readonly string[] DemoNames =
-    {
-        "Dijkstra VS A*",
-        "Seek And Flee"
-    };
 
     void Start()
     {
@@ -22,12 +23,43 @@ public class DropDownHandler : MonoBehaviour
             return;
 
         dropdown.options.Clear();
-        foreach (string name in DemoNames)
+        foreach (string name in GetBuildSceneNames())
             dropdown.options.Add(new TMP_Dropdown.OptionData(name));
 
+        dropdown.RefreshShownValue();
         dropdown.onValueChanged.AddListener(_ => ShowSelected(dropdown));
         ShowSelected(dropdown);
     }
+
+    static IEnumerable<string> GetBuildSceneNames()
+    {
+#if UNITY_EDITOR
+        BuildProfile profile = BuildProfile.GetActiveBuildProfile();
+        EditorBuildSettingsScene[] scenes = profile != null
+            ? profile.GetScenesForBuild()
+            : EditorBuildSettings.scenes;
+
+        foreach (EditorBuildSettingsScene scene in scenes)
+        {
+            if (!scene.enabled || string.IsNullOrEmpty(scene.path))
+                continue;
+
+            yield return FormatSceneName(Path.GetFileNameWithoutExtension(scene.path));
+        }
+#else
+        for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
+        {
+            string path = SceneUtility.GetScenePathByBuildIndex(i);
+            if (string.IsNullOrEmpty(path))
+                continue;
+
+            yield return FormatSceneName(Path.GetFileNameWithoutExtension(path));
+        }
+#endif
+    }
+
+    static string FormatSceneName(string sceneName) =>
+        sceneName.Replace('_', ' ');
 
     void ShowSelected(TMP_Dropdown dropdown)
     {
