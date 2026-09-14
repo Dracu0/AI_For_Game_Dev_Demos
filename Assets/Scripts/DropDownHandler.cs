@@ -3,6 +3,7 @@ using System.IO;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -15,8 +16,11 @@ using UnityEditor.Build.Profile;
 public class DropDownHandler : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI TextBox;
+    [SerializeField] Button loadButton;
     [Tooltip("First build index to include. 1 skips index 0, 2 skips indexes 0 and 1.")]
     [SerializeField] int minBuildIndex;
+
+    readonly List<string> scenePaths = new();
 
     void Start()
     {
@@ -25,15 +29,30 @@ public class DropDownHandler : MonoBehaviour
             return;
 
         dropdown.options.Clear();
-        foreach (string name in GetBuildSceneNames())
-            dropdown.options.Add(new TMP_Dropdown.OptionData(name));
+        scenePaths.Clear();
+
+        foreach (string path in GetBuildScenePaths())
+        {
+            scenePaths.Add(path);
+            dropdown.options.Add(new TMP_Dropdown.OptionData(
+                FormatSceneName(Path.GetFileNameWithoutExtension(path))));
+        }
 
         dropdown.RefreshShownValue();
         dropdown.onValueChanged.AddListener(_ => ShowSelected(dropdown));
         ShowSelected(dropdown);
+
+        if (loadButton != null)
+            loadButton.onClick.AddListener(LoadSelectedScene);
     }
 
-    IEnumerable<string> GetBuildSceneNames()
+    void OnDestroy()
+    {
+        if (loadButton != null)
+            loadButton.onClick.RemoveListener(LoadSelectedScene);
+    }
+
+    IEnumerable<string> GetBuildScenePaths()
     {
 #if UNITY_EDITOR
         BuildProfile profile = BuildProfile.GetActiveBuildProfile();
@@ -50,7 +69,7 @@ public class DropDownHandler : MonoBehaviour
             if (!scene.enabled || string.IsNullOrEmpty(scene.path))
                 continue;
 
-            yield return FormatSceneName(Path.GetFileNameWithoutExtension(scene.path));
+            yield return scene.path;
         }
 #else
         for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
@@ -62,9 +81,22 @@ public class DropDownHandler : MonoBehaviour
             if (string.IsNullOrEmpty(path))
                 continue;
 
-            yield return FormatSceneName(Path.GetFileNameWithoutExtension(path));
+            yield return path;
         }
 #endif
+    }
+
+    void LoadSelectedScene()
+    {
+        TMP_Dropdown dropdown = GetComponent<TMP_Dropdown>();
+        if (dropdown == null || scenePaths.Count == 0)
+            return;
+
+        int index = dropdown.value;
+        if (index < 0 || index >= scenePaths.Count)
+            return;
+
+        SceneManager.LoadScene(Path.GetFileNameWithoutExtension(scenePaths[index]));
     }
 
     static string FormatSceneName(string sceneName) =>
