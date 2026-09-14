@@ -315,11 +315,13 @@ public class PathfindingDemo : MonoBehaviour
         if (cell == _start)
             return;
 
-        if (_target.x >= 0)
-            PaintCell(_target);
-
+        Vector2Int previousTarget = _target;
         _target = cell;
-        PaintCell(cell);
+
+        if (previousTarget.x >= 0)
+            PaintCell(previousTarget);
+
+        PaintCell(_target);
         OnMapEdited();
         SetStatus("Target moved. Press Space to run A*.");
     }
