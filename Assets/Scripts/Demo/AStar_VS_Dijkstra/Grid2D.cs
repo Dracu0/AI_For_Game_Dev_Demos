@@ -40,11 +40,6 @@ namespace Pathfinding
                 _walkable[i] = true;
         }
 
-        public Grid2D(Grid2D source) : this(source.Width, source.Height)
-        {
-            source._walkable.CopyTo(_walkable, 0);
-        }
-
         // ------------------------------------------------------------------
         // Bounds and walkability
         // ------------------------------------------------------------------

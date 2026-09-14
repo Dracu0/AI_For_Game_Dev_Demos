@@ -1,8 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// Shared steering formula used by Seek, Flee, Arrival, and Pursue.
+/// Shared steering math used by every steering behaviour.
 ///
+/// Core formula (same in every behaviour):
 ///   steering = desiredVelocity - currentVelocity
 ///   velocity += steering * deltaTime
 ///
@@ -21,15 +22,26 @@ public static class SteeringMath
         return offset.normalized;
     }
 
+    /// <summary>Apply the steering formula to a velocity value.</summary>
+    public static Vector2 ApplySteering(
+        Vector2 currentVelocity,
+        Vector2 desiredVelocity,
+        float maxForce,
+        float maxSpeed,
+        float deltaTime)
+    {
+        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - currentVelocity, maxForce);
+        return Vector2.ClampMagnitude(currentVelocity + steering * deltaTime, maxSpeed);
+    }
+
+    /// <summary>Apply steering through a Rigidbody2D (used by enemy scripts).</summary>
     public static Vector2 Steer(
         Rigidbody2D rb,
         Vector2 desiredVelocity,
         float maxForce,
         float maxSpeed)
     {
-        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - rb.linearVelocity, maxForce);
-        Vector2 velocity = rb.linearVelocity + steering * Time.fixedDeltaTime;
-        return Vector2.ClampMagnitude(velocity, maxSpeed);
+        return ApplySteering(rb.linearVelocity, desiredVelocity, maxForce, maxSpeed, Time.fixedDeltaTime);
     }
 
     public static void Stop(Rigidbody2D rb)

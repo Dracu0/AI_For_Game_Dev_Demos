@@ -33,7 +33,7 @@ public class SeekAndFleeDemo : MonoBehaviour
     [SerializeField] TMP_Text statusText;
 
     SteeringAgent _seeker;
-    SteeringAgent _fleer;
+    SteeringAgent _fleeAgent;
     Transform _target;
     Camera _camera;
 
@@ -43,7 +43,7 @@ public class SeekAndFleeDemo : MonoBehaviour
         if (!ValidateSetup())
             return;
 
-        HideLegacyPathfindingObjects();
+        HidePathfindingGridIfPresent();
         BuildScene();
         FrameCamera();
         SetStatus(
@@ -54,7 +54,7 @@ public class SeekAndFleeDemo : MonoBehaviour
 
     void Update()
     {
-        if (_seeker == null || _fleer == null || _target == null)
+        if (_seeker == null || _fleeAgent == null || _target == null)
             return;
 
         if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
@@ -69,7 +69,7 @@ public class SeekAndFleeDemo : MonoBehaviour
 
         Vector2 targetPosition = _target.position;
         _seeker.SeekToward(targetPosition);
-        _fleer.FleeFrom(targetPosition);
+        _fleeAgent.FleeFrom(targetPosition);
     }
 
     bool ValidateSetup()
@@ -86,7 +86,8 @@ public class SeekAndFleeDemo : MonoBehaviour
         return true;
     }
 
-    void HideLegacyPathfindingObjects()
+    // This demo can share a scene with the pathfinding grid. Hide it at runtime.
+    void HidePathfindingGridIfPresent()
     {
         GameObject grid = GameObject.Find("Grid");
         if (grid != null)
@@ -96,7 +97,7 @@ public class SeekAndFleeDemo : MonoBehaviour
     void BuildScene()
     {
         _seeker = CreateAgent("Seeker", seekerSpawn, seekerColor);
-        _fleer = CreateAgent("Fleer", fleerSpawn, fleerColor);
+        _fleeAgent = CreateAgent("FleeAgent", fleerSpawn, fleerColor);
         _target = CreateMarker("Target", targetSpawn, targetColor);
     }
 
@@ -146,9 +147,9 @@ public class SeekAndFleeDemo : MonoBehaviour
     void ResetAgents()
     {
         _seeker.transform.position = seekerSpawn;
-        _fleer.transform.position = fleerSpawn;
+        _fleeAgent.transform.position = fleerSpawn;
         _seeker.ResetMotion();
-        _fleer.ResetMotion();
+        _fleeAgent.ResetMotion();
         SetStatus("Agents reset. LMB: move target.");
     }
 

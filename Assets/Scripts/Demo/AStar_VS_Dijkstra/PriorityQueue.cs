@@ -16,7 +16,7 @@ namespace Pathfinding
         struct Entry
         {
             public float Priority;
-            public long Order;
+            public long Order; // Tie-breaker so equal priorities dequeue in FIFO order.
             public TItem Item;
         }
 

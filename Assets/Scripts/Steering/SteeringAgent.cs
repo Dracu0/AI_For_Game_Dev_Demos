@@ -2,7 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Simple agent used by the Seek vs Flee demo.
-/// Applies seek or flee using transform movement instead of a Rigidbody2D.
+/// Uses the same SteeringMath formula as the enemy scripts,
+/// but moves a Transform directly instead of a Rigidbody2D.
 /// </summary>
 public class SteeringAgent : MonoBehaviour
 {
@@ -34,9 +35,7 @@ public class SteeringAgent : MonoBehaviour
 
     void Apply(Vector2 desiredVelocity)
     {
-        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - _velocity, maxForce);
-        _velocity += steering * Time.deltaTime;
-        _velocity = Vector2.ClampMagnitude(_velocity, maxSpeed);
+        _velocity = SteeringMath.ApplySteering(_velocity, desiredVelocity, maxForce, maxSpeed, Time.deltaTime);
         transform.position += (Vector3)(_velocity * Time.deltaTime);
     }
 }
