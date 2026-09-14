@@ -15,6 +15,8 @@ using UnityEditor.Build.Profile;
 public class DropDownHandler : MonoBehaviour
 {
     [SerializeField] TextMeshProUGUI TextBox;
+    [Tooltip("First build index to include. 1 skips index 0, 2 skips indexes 0 and 1.")]
+    [SerializeField] int minBuildIndex;
 
     void Start()
     {
@@ -31,7 +33,7 @@ public class DropDownHandler : MonoBehaviour
         ShowSelected(dropdown);
     }
 
-    static IEnumerable<string> GetBuildSceneNames()
+    IEnumerable<string> GetBuildSceneNames()
     {
 #if UNITY_EDITOR
         BuildProfile profile = BuildProfile.GetActiveBuildProfile();
@@ -39,8 +41,12 @@ public class DropDownHandler : MonoBehaviour
             ? profile.GetScenesForBuild()
             : EditorBuildSettings.scenes;
 
-        foreach (EditorBuildSettingsScene scene in scenes)
+        for (int i = 0; i < scenes.Length; i++)
         {
+            if (i < minBuildIndex)
+                continue;
+
+            EditorBuildSettingsScene scene = scenes[i];
             if (!scene.enabled || string.IsNullOrEmpty(scene.path))
                 continue;
 
@@ -49,6 +55,9 @@ public class DropDownHandler : MonoBehaviour
 #else
         for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
         {
+            if (i < minBuildIndex)
+                continue;
+
             string path = SceneUtility.GetScenePathByBuildIndex(i);
             if (string.IsNullOrEmpty(path))
                 continue;

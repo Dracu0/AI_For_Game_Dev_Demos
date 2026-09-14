@@ -6,8 +6,17 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/Independent Systems/Vectors.unity
-    guid: 8c9cfa26abfee488c85f1582747f6a02
+    path: Assets/Scenes/MainMenu/MainMenu.unity
+    guid: d35809acedf7de04aa90554136690644
+  - enabled: 1
+    path: Assets/Scenes/Shared Demos/Seek_Flee_Arrival_Pursue.unity
+    guid: ba1b413d550ad774fb62c6bec7031e30
+  - enabled: 1
+    path: Assets/Scenes/Shared Demos/Obstacle_Avoidance.unity
+    guid: 65e0d5626c5bbe6458f601f09e9ab1aa
+  - enabled: 1
+    path: Assets/Scenes/Shared Demos/Dijkstra_VS_AStar.unity
+    guid: b2961dae8401fc14b8ff755b583bedf8
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2f6852c84bf8c344788805cb8bca4477, type: 3}
   m_UseUCBPForAssetBundles: 0
