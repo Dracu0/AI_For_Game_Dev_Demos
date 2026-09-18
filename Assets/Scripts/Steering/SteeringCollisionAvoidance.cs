@@ -16,6 +16,7 @@ using UnityEngine.Serialization;
 public class SteeringCollisionAvoidance : MonoBehaviour
 {
     const float MinDistance = 0.0001f;
+    const float MinLookAheadScale = 0.5f;
 
     static readonly Collider2D[] NearbyObstacles = new Collider2D[16];
 
@@ -59,7 +60,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         if (obstacle == null)
             return Vector2.zero;
 
-        return ComputeAvoidanceForce(position, ahead, obstacle);
+        return ComputeAvoidanceForce(position, ahead, obstacle, desiredVelocity);
     }
 
     /// <summary>Stops velocity from pushing the circle deeper into a wall.</summary>
@@ -100,6 +101,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         out Vector2 ahead,
         out Vector2 ahead2)
     {
+        bool wantsToMove = desiredVelocity.sqrMagnitude > MinDistance;
         Vector2 direction = velocity.sqrMagnitude > MinDistance ? velocity : desiredVelocity;
         if (direction.sqrMagnitude < MinDistance)
         {
@@ -110,9 +112,14 @@ public class SteeringCollisionAvoidance : MonoBehaviour
 
         direction.Normalize();
 
-        float lookLength = maxSeeAhead;
-        if (maxSpeed > MinDistance)
-            lookLength *= Mathf.Clamp01(velocity.magnitude / maxSpeed);
+        float speedScale = maxSpeed > MinDistance
+            ? Mathf.Clamp01(velocity.magnitude / maxSpeed)
+            : 0f;
+        float lookLength = maxSeeAhead * speedScale;
+
+        // Tuts+ shortens ahead when slow; still probe forward when seeking so walls are seen before contact.
+        if (wantsToMove && lookLength < maxSeeAhead * MinLookAheadScale)
+            lookLength = maxSeeAhead * MinLookAheadScale;
 
         ahead = position + direction * lookLength;
         ahead2 = position + direction * lookLength * 0.5f;
@@ -171,16 +178,35 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         return (point - onSurface).sqrMagnitude <= hitRadius * hitRadius;
     }
 
-    Vector2 ComputeAvoidanceForce(Vector2 position, Vector2 ahead, Collider2D obstacle)
+    Vector2 ComputeAvoidanceForce(
+        Vector2 position,
+        Vector2 ahead,
+        Collider2D obstacle,
+        Vector2 desiredVelocity)
     {
-        Vector2 push = ahead - obstacle.ClosestPoint(ahead);
-        if (push.sqrMagnitude < MinDistance)
-            push = position - obstacle.ClosestPoint(position);
+        Vector2 awayFromWall = ahead - obstacle.ClosestPoint(ahead);
+        if (awayFromWall.sqrMagnitude < MinDistance)
+            awayFromWall = position - obstacle.ClosestPoint(position);
 
-        if (push.sqrMagnitude < MinDistance)
+        if (awayFromWall.sqrMagnitude < MinDistance)
             return Vector2.zero;
 
-        return push.normalized * maxAvoidForce;
+        Vector2 wallOut = awayFromWall.normalized;
+
+        if (desiredVelocity.sqrMagnitude < MinDistance)
+            return wallOut * maxAvoidForce;
+
+        // Goal is through the wall: push along the surface instead of fighting seek head-on.
+        Vector2 intoWall = -wallOut;
+        float towardWall = Vector2.Dot(desiredVelocity.normalized, intoWall);
+        if (towardWall < 0.7f)
+            return wallOut * maxAvoidForce;
+
+        Vector2 alongWall = desiredVelocity - intoWall * Vector2.Dot(desiredVelocity, intoWall);
+        if (alongWall.sqrMagnitude < MinDistance)
+            alongWall = new Vector2(-wallOut.y, wallOut.x);
+
+        return alongWall.normalized * maxAvoidForce;
     }
 
     float Radius() =>
