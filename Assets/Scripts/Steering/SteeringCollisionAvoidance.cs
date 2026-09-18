@@ -3,13 +3,11 @@ using UnityEngine;
 using UnityEngine.Serialization;
 
 /// <summary>
-/// Collision avoidance from Fernando Bevilacqua's Tuts+ steering series:
+/// Tuts+ collision avoidance with Unity ray/circle casts along the movement line.
 /// https://code.tutsplus.com/understanding-steering-behaviors-collision-avoidance--gamedev-7777t
 ///
-/// 1. Cast two "look ahead" points along velocity (shorter when moving slowly).
-/// 2. If position, ahead, or ahead/2 hits an obstacle, pick the closest one.
-/// 3. avoidanceForce = normalize(ahead - obstacle) × maxAvoidForce
-/// 4. SteeringMath adds this force to seek/flee steering before integrating velocity.
+/// CircleCast = a thick ray matching the agent radius — hits collider edges at the right distance.
+/// Avoidance force ≈ normalize(ahead − hitPoint) × maxAvoidForce (falls back to hit normal).
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(CircleCollider2D))]
@@ -18,7 +16,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     const float MinDistance = 0.0001f;
     const float MinLookAheadScale = 0.5f;
 
-    static readonly Collider2D[] NearbyObstacles = new Collider2D[16];
+    static readonly Collider2D[] TouchingWalls = new Collider2D[8];
 
     [FormerlySerializedAs("obstacleLayers")]
     [FormerlySerializedAs("_obstacleLayers")]
@@ -32,49 +30,46 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     [FormerlySerializedAs("_maxAvoidForce")]
     [SerializeField] float maxAvoidForce = 12f;
 
-    [Tooltip("Treats the agent as slightly larger when testing ahead points.")]
+    [Tooltip("Extra radius on casts so agents keep a small gap from edges.")]
     [FormerlySerializedAs("_wallClearance")]
     [SerializeField] float obstaclePadding = 0.4f;
 
     CircleCollider2D body;
-    ContactFilter2D obstacleFilter;
 
-    void Awake()
-    {
-        body = GetComponent<CircleCollider2D>();
-        obstacleFilter = new ContactFilter2D { useLayerMask = true, useTriggers = false };
-        obstacleFilter.SetLayerMask(obstacleLayers);
-    }
+    void Awake() => body = GetComponent<CircleCollider2D>();
 
-    /// <summary>Force to add to steering (seek + avoidance, then clamp).</summary>
     public Vector2 GetAvoidanceForce(
         Vector2 position,
         Vector2 velocity,
         Vector2 desiredVelocity,
         float maxSpeed)
     {
-        BuildLookAheadPoints(position, velocity, desiredVelocity, maxSpeed, out Vector2 ahead, out Vector2 ahead2);
-
-        float agentRadius = Radius();
-        Collider2D obstacle = FindMostThreateningObstacle(position, ahead, ahead2, agentRadius);
-        if (obstacle == null)
+        if (!TryGetLookRay(velocity, desiredVelocity, maxSpeed, out Vector2 direction, out float lookLength))
             return Vector2.zero;
 
-        return ComputeAvoidanceForce(position, ahead, obstacle, desiredVelocity);
+        float castRadius = Radius() + obstaclePadding;
+        if (!TryFindClosestHit(position, direction, lookLength, castRadius, out CastHit hit))
+            return Vector2.zero;
+
+        Vector2 ahead = position + direction * lookLength;
+        return BuildForce(position, ahead, hit, desiredVelocity);
     }
 
-    /// <summary>Stops velocity from pushing the circle deeper into a wall.</summary>
     public Vector2 PreventMovingIntoWalls(Vector2 position, Vector2 velocity)
     {
         if (velocity.sqrMagnitude < MinDistance)
             return velocity;
 
-        int count = Physics2D.OverlapCircle(position, Radius(), obstacleFilter, NearbyObstacles);
+        ContactFilter2D filter = default;
+        filter.SetLayerMask(obstacleLayers);
+        filter.useTriggers = false;
+
+        int count = Physics2D.OverlapCircle(position, Radius(), filter, TouchingWalls);
         Vector2 result = velocity;
 
         for (int i = 0; i < count; i++)
         {
-            Collider2D wall = NearbyObstacles[i];
+            Collider2D wall = TouchingWalls[i];
             if (wall == null || wall == body)
                 continue;
 
@@ -91,23 +86,19 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         return result;
     }
 
-    // --- Tuts+ look ahead (velocity direction, length scales with speed) ---
-
-    void BuildLookAheadPoints(
-        Vector2 position,
+    bool TryGetLookRay(
         Vector2 velocity,
         Vector2 desiredVelocity,
         float maxSpeed,
-        out Vector2 ahead,
-        out Vector2 ahead2)
+        out Vector2 direction,
+        out float lookLength)
     {
         bool wantsToMove = desiredVelocity.sqrMagnitude > MinDistance;
-        Vector2 direction = velocity.sqrMagnitude > MinDistance ? velocity : desiredVelocity;
+        direction = velocity.sqrMagnitude > MinDistance ? velocity : desiredVelocity;
         if (direction.sqrMagnitude < MinDistance)
         {
-            ahead = position;
-            ahead2 = position;
-            return;
+            lookLength = 0f;
+            return false;
         }
 
         direction.Normalize();
@@ -115,78 +106,105 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         float speedScale = maxSpeed > MinDistance
             ? Mathf.Clamp01(velocity.magnitude / maxSpeed)
             : 0f;
-        float lookLength = maxSeeAhead * speedScale;
+        lookLength = maxSeeAhead * speedScale;
 
-        // Tuts+ shortens ahead when slow; still probe forward when seeking so walls are seen before contact.
         if (wantsToMove && lookLength < maxSeeAhead * MinLookAheadScale)
             lookLength = maxSeeAhead * MinLookAheadScale;
 
-        ahead = position + direction * lookLength;
-        ahead2 = position + direction * lookLength * 0.5f;
+        return true;
     }
 
-    // --- Tuts+ findMostThreateningObstacle ---
-
-    Collider2D FindMostThreateningObstacle(
-        Vector2 position,
-        Vector2 ahead,
-        Vector2 ahead2,
-        float agentRadius)
+    struct CastHit
     {
-        float hitRadius = agentRadius + obstaclePadding;
-        float searchRadius = Vector2.Distance(position, ahead) + hitRadius;
+        public Vector2 Point;
+        public Vector2 Normal;
+        public float Distance;
+    }
 
-        int count = Physics2D.OverlapCircle(position, searchRadius, obstacleFilter, NearbyObstacles);
-        Collider2D closest = null;
-        float closestDistanceSq = float.MaxValue;
+    /// <summary>Full and half-length circle casts, plus overlap if already touching a wall.</summary>
+    bool TryFindClosestHit(
+        Vector2 position,
+        Vector2 direction,
+        float lookLength,
+        float castRadius,
+        out CastHit closest)
+    {
+        closest = default;
+        float closestDistance = float.MaxValue;
 
+        RegisterCast(
+            Physics2D.CircleCast(position, castRadius, direction, lookLength, obstacleLayers),
+            ref closest,
+            ref closestDistance);
+        RegisterCast(
+            Physics2D.CircleCast(position, castRadius, direction, lookLength * 0.5f, obstacleLayers),
+            ref closest,
+            ref closestDistance);
+
+        ContactFilter2D filter = default;
+        filter.SetLayerMask(obstacleLayers);
+        filter.useTriggers = false;
+
+        int count = Physics2D.OverlapCircle(position, castRadius, filter, TouchingWalls);
         for (int i = 0; i < count; i++)
         {
-            Collider2D candidate = NearbyObstacles[i];
-            if (candidate == null || candidate == body)
+            Collider2D wall = TouchingWalls[i];
+            if (wall == null || wall == body)
                 continue;
 
-            if (!ObstacleBlocksPath(position, ahead, ahead2, hitRadius, candidate))
-                continue;
-
-            float distanceSq = (candidate.ClosestPoint(position) - position).sqrMagnitude;
-            if (distanceSq >= closestDistanceSq)
-                continue;
-
-            closestDistanceSq = distanceSq;
-            closest = candidate;
+            RegisterTouch(position, wall, ref closest, ref closestDistance);
         }
 
-        return closest;
+        return closestDistance < float.MaxValue;
     }
 
-    static bool ObstacleBlocksPath(
+    void RegisterCast(RaycastHit2D hit, ref CastHit closest, ref float closestDistance)
+    {
+        if (hit.collider == null || hit.collider == body || hit.distance >= closestDistance)
+            return;
+
+        closestDistance = hit.distance;
+        closest = new CastHit
+        {
+            Point = hit.point,
+            Normal = hit.normal,
+            Distance = hit.distance
+        };
+    }
+
+    static void RegisterTouch(
+        Vector2 agentPosition,
+        Collider2D wall,
+        ref CastHit closest,
+        ref float closestDistance)
+    {
+        if (closestDistance <= 0f)
+            return;
+
+        Vector2 onSurface = wall.ClosestPoint(agentPosition);
+        Vector2 toAgent = agentPosition - onSurface;
+        Vector2 normal = toAgent.sqrMagnitude > MinDistance
+            ? toAgent.normalized
+            : Vector2.up;
+
+        closestDistance = 0f;
+        closest = new CastHit
+        {
+            Point = onSurface,
+            Normal = normal,
+            Distance = 0f
+        };
+    }
+
+    Vector2 BuildForce(
         Vector2 position,
         Vector2 ahead,
-        Vector2 ahead2,
-        float hitRadius,
-        Collider2D obstacle)
-    {
-        return PointHitsObstacle(position, hitRadius, obstacle)
-            || PointHitsObstacle(ahead, hitRadius, obstacle)
-            || PointHitsObstacle(ahead2, hitRadius, obstacle);
-    }
-
-    static bool PointHitsObstacle(Vector2 point, float hitRadius, Collider2D obstacle)
-    {
-        Vector2 onSurface = obstacle.ClosestPoint(point);
-        return (point - onSurface).sqrMagnitude <= hitRadius * hitRadius;
-    }
-
-    Vector2 ComputeAvoidanceForce(
-        Vector2 position,
-        Vector2 ahead,
-        Collider2D obstacle,
+        CastHit hit,
         Vector2 desiredVelocity)
     {
-        Vector2 awayFromWall = ahead - obstacle.ClosestPoint(ahead);
+        Vector2 awayFromWall = ahead - hit.Point;
         if (awayFromWall.sqrMagnitude < MinDistance)
-            awayFromWall = position - obstacle.ClosestPoint(position);
+            awayFromWall = hit.Normal.sqrMagnitude > MinDistance ? hit.Normal : position - hit.Point;
 
         if (awayFromWall.sqrMagnitude < MinDistance)
             return Vector2.zero;
@@ -196,7 +214,6 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         if (desiredVelocity.sqrMagnitude < MinDistance)
             return wallOut * maxAvoidForce;
 
-        // Goal is through the wall: push along the surface instead of fighting seek head-on.
         Vector2 intoWall = -wallOut;
         float towardWall = Vector2.Dot(desiredVelocity.normalized, intoWall);
         if (towardWall < 0.7f)
