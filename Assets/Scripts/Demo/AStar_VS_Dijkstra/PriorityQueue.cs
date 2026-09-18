@@ -9,29 +9,17 @@ namespace Pathfinding
     /// </summary>
     public sealed class PriorityQueue<TItem>
     {
-        // ------------------------------------------------------------------
-        // Stored entry
-        // ------------------------------------------------------------------
-
         struct Entry
         {
             public float Priority;
-            public long Order; // Tie-breaker so equal priorities dequeue in FIFO order.
+            public long Order;
             public TItem Item;
         }
-
-        // ------------------------------------------------------------------
-        // State
-        // ------------------------------------------------------------------
 
         readonly List<Entry> _items = new List<Entry>();
         long _order;
 
         public bool IsEmpty => _items.Count == 0;
-
-        // ------------------------------------------------------------------
-        // Public API
-        // ------------------------------------------------------------------
 
         public void Enqueue(TItem item, float priority)
         {
@@ -63,10 +51,6 @@ namespace Pathfinding
 
             return best.Item;
         }
-
-        // ------------------------------------------------------------------
-        // Min-heap maintenance
-        // ------------------------------------------------------------------
 
         void BubbleUp(int index)
         {

@@ -4,63 +4,43 @@ using UnityEngine;
 /// Pursue — seek the player's predicted position (lookahead T = distance / targetMaxSpeed).
 /// Only active inside pursue range.
 /// </summary>
-[RequireComponent(typeof(Rigidbody2D))]
-public class PursueEnemy : MonoBehaviour
+public class PursueEnemy : SteeringEnemyBase
 {
-    [Header("Target")]
-    [SerializeField] Transform player;
-
     [Header("Pursue Range")]
     [SerializeField] Transform pursueRangeCircle;
     [SerializeField] float pursueRange = 8f;
 
-    [Header("Movement")]
-    [SerializeField] float maxSpeed = 3f;
-    [SerializeField] float maxForce = 6f;
+    [Header("Prediction")]
     [SerializeField] float targetMaxSpeed = 5f;
 
-    Rigidbody2D _rb;
     Rigidbody2D _playerRb;
-    SteeringCollisionAvoidance _avoidance;
 
-    void Awake()
+    protected override void Awake()
     {
-        _rb = GetComponent<Rigidbody2D>();
-        _avoidance = GetComponent<SteeringCollisionAvoidance>();
-        SteeringMath.SetupEnemy(_rb);
-        SteeringMath.ResizeCircle(pursueRangeCircle, pursueRange);
+        base.Awake();
         if (player != null)
             _playerRb = player.GetComponent<Rigidbody2D>();
     }
 
-    void OnValidate()
-    {
+    protected override void RefreshRangeVisuals() =>
         SteeringMath.ResizeCircle(pursueRangeCircle, pursueRange);
-    }
 
-    void FixedUpdate()
+    protected override bool TryGetDesiredVelocity(out Vector2 desired)
     {
-        if (player == null)
-            return;
-
-        if (SteeringMath.IsOutOfRange(_rb.position, player.position, pursueRange))
+        if (SteeringMath.IsOutOfRange(Body.position, player.position, pursueRange))
         {
-            SteeringMath.Stop(_rb);
-            return;
+            desired = default;
+            return false;
         }
 
         Vector2 targetVelocity = _playerRb != null ? _playerRb.linearVelocity : Vector2.zero;
-        Vector2 predictedPosition = SteeringMath.PredictPosition(
-            _rb.position,
+        Vector2 predicted = SteeringMath.PredictPosition(
+            Body.position,
             player.position,
             targetVelocity,
             targetMaxSpeed);
 
-        _rb.linearVelocity = SteeringMath.Steer(
-            _rb,
-            SteeringMath.SeekVelocity(_rb.position, predictedPosition, maxSpeed),
-            maxForce,
-            maxSpeed,
-            _avoidance);
+        desired = SteeringMath.SeekVelocity(Body.position, predicted, maxSpeed);
+        return true;
     }
 }

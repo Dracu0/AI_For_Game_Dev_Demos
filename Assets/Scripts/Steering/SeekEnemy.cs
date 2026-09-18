@@ -4,52 +4,24 @@ using UnityEngine;
 /// Seek — desiredVelocity = normalize(target - position) * maxSpeed.
 /// Only active inside seek range.
 /// </summary>
-[RequireComponent(typeof(Rigidbody2D))]
-public class SeekEnemy : MonoBehaviour
+public class SeekEnemy : SteeringEnemyBase
 {
-    [Header("Target")]
-    [SerializeField] Transform player;
-
     [Header("Seek Range")]
     [SerializeField] Transform seekRangeCircle;
     [SerializeField] float seekRange = 5f;
 
-    [Header("Movement")]
-    [SerializeField] float maxSpeed = 3f;
-    [SerializeField] float maxForce = 6f;
-
-    Rigidbody2D _rb;
-    SteeringCollisionAvoidance _avoidance;
-
-    void Awake()
-    {
-        _rb = GetComponent<Rigidbody2D>();
-        _avoidance = GetComponent<SteeringCollisionAvoidance>();
-        SteeringMath.SetupEnemy(_rb);
+    protected override void RefreshRangeVisuals() =>
         SteeringMath.ResizeCircle(seekRangeCircle, seekRange);
-    }
 
-    void OnValidate()
+    protected override bool TryGetDesiredVelocity(out Vector2 desired)
     {
-        SteeringMath.ResizeCircle(seekRangeCircle, seekRange);
-    }
-
-    void FixedUpdate()
-    {
-        if (player == null)
-            return;
-
-        if (SteeringMath.IsOutOfRange(_rb.position, player.position, seekRange))
+        if (SteeringMath.IsOutOfRange(Body.position, player.position, seekRange))
         {
-            SteeringMath.Stop(_rb);
-            return;
+            desired = default;
+            return false;
         }
 
-        _rb.linearVelocity = SteeringMath.Steer(
-            _rb,
-            SteeringMath.SeekVelocity(_rb.position, player.position, maxSpeed),
-            maxForce,
-            maxSpeed,
-            _avoidance);
+        desired = SteeringMath.SeekVelocity(Body.position, player.position, maxSpeed);
+        return true;
     }
 }

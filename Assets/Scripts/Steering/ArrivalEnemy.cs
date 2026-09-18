@@ -4,12 +4,8 @@ using UnityEngine;
 /// Arrival — seek at full speed, then ramp down inside slowRadius (distance / slowRadius).
 /// Only active inside detection range.
 /// </summary>
-[RequireComponent(typeof(Rigidbody2D))]
-public class ArrivalEnemy : MonoBehaviour
+public class ArrivalEnemy : SteeringEnemyBase
 {
-    [Header("Target")]
-    [SerializeField] Transform player;
-
     [Header("Detection")]
     [SerializeField] Transform detectionRangeCircle;
     [SerializeField] float detectionRange = 5f;
@@ -18,50 +14,27 @@ public class ArrivalEnemy : MonoBehaviour
     [SerializeField] Transform slowRadiusCircle;
     [SerializeField] float slowRadius = 3f;
 
-    [Header("Movement")]
-    [SerializeField] float maxSpeed = 3f;
-    [SerializeField] float maxForce = 6f;
-
-    Rigidbody2D _rb;
-    SteeringCollisionAvoidance _avoidance;
-
-    void Awake()
+    protected override void RefreshRangeVisuals()
     {
-        _rb = GetComponent<Rigidbody2D>();
-        _avoidance = GetComponent<SteeringCollisionAvoidance>();
-        SteeringMath.SetupEnemy(_rb);
-        UpdateRangeCircles();
+        SteeringMath.ResizeCircle(detectionRangeCircle, detectionRange);
+        SteeringMath.ResizeCircle(slowRadiusCircle, slowRadius);
     }
 
-    void OnValidate()
+    protected override bool TryGetDesiredVelocity(out Vector2 desired)
     {
-        UpdateRangeCircles();
-    }
-
-    void FixedUpdate()
-    {
-        if (player == null)
-            return;
-
-        float distance = Vector2.Distance(_rb.position, player.position);
+        float distance = Vector2.Distance(Body.position, player.position);
         if (distance > detectionRange)
         {
-            SteeringMath.Stop(_rb);
-            return;
+            desired = default;
+            return false;
         }
 
-        Vector2 desiredVelocity = SteeringMath.ArrivalVelocity(
-            _rb.position,
+        desired = SteeringMath.ArrivalVelocity(
+            Body.position,
             player.position,
             distance,
             maxSpeed,
             slowRadius);
-        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed, _avoidance);
-    }
-
-    void UpdateRangeCircles()
-    {
-        SteeringMath.ResizeCircle(detectionRangeCircle, detectionRange);
-        SteeringMath.ResizeCircle(slowRadiusCircle, slowRadius);
+        return true;
     }
 }

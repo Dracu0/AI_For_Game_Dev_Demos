@@ -12,23 +12,11 @@ namespace Pathfinding
     /// </summary>
     public class Grid2D
     {
-        // ------------------------------------------------------------------
-        // Grid size
-        // ------------------------------------------------------------------
-
         public int Width { get; }
         public int Height { get; }
         public int CellCount => Width * Height;
 
-        // ------------------------------------------------------------------
-        // Cell data
-        // ------------------------------------------------------------------
-
         readonly bool[] _walkable;
-
-        // ------------------------------------------------------------------
-        // Construction
-        // ------------------------------------------------------------------
 
         public Grid2D(int width, int height)
         {
@@ -39,10 +27,6 @@ namespace Pathfinding
             for (int i = 0; i < _walkable.Length; i++)
                 _walkable[i] = true;
         }
-
-        // ------------------------------------------------------------------
-        // Bounds and walkability
-        // ------------------------------------------------------------------
 
         public bool InBounds(int x, int y) =>
             x >= 0 && x < Width && y >= 0 && y < Height;
@@ -56,10 +40,6 @@ namespace Pathfinding
                 _walkable[y * Width + x] = walkable;
         }
 
-        // ------------------------------------------------------------------
-        // Coordinates
-        // ------------------------------------------------------------------
-
         public int IndexOf(int x, int y) => y * Width + x;
 
         public void GetCoords(int index, out int x, out int y)
@@ -67,10 +47,6 @@ namespace Pathfinding
             x = index % Width;
             y = index / Width;
         }
-
-        // ------------------------------------------------------------------
-        // Neighbours (8-directional movement)
-        // ------------------------------------------------------------------
 
         public List<Vector2Int> GetWalkableNeighbours(Vector2Int cell)
         {

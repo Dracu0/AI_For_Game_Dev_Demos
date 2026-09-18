@@ -1,3 +1,4 @@
+// ReSharper disable CheckNamespace
 using UnityEngine;
 
 /// <summary>
@@ -9,13 +10,14 @@ using UnityEngine;
 ///
 /// Behaviour scripts pick desiredVelocity using SeekVelocity, FleeVelocity,
 /// ArrivalVelocity, or PredictPosition, then apply it with Steer.
-/// Optional collision avoidance is added to desired velocity before Steer.
+/// Optional collision avoidance is added to steering before velocity integration.
 /// </summary>
 public static class SteeringMath
 {
     public const float Epsilon = 0.0001f;
 
     static readonly Collider2D[] OverlapHits = new Collider2D[16];
+    static PhysicsMaterial2D _frictionlessMaterial;
 
     public static Vector2 Direction(Vector2 from, Vector2 to)
     {
@@ -44,33 +46,41 @@ public static class SteeringMath
         Vector2 desiredVelocity,
         float maxForce,
         float maxSpeed,
-        Vector2 extraVelocity = default)
-    {
-        return ApplySteering(
-            rb.linearVelocity,
-            desiredVelocity + extraVelocity,
-            maxForce,
-            maxSpeed,
-            Time.fixedDeltaTime);
-    }
-
-    public static Vector2 Steer(
-        Rigidbody2D rb,
-        Vector2 desiredVelocity,
-        float maxForce,
-        float maxSpeed,
         SteeringCollisionAvoidance avoidance)
     {
-        Vector2 extra = avoidance != null
-            ? avoidance.GetForce(rb.position, rb.linearVelocity, maxSpeed)
-            : Vector2.zero;
+        Vector2 position = rb.position;
+        Vector2 current = rb.linearVelocity;
+        float deltaTime = Time.fixedDeltaTime;
 
-        return Steer(rb, desiredVelocity, maxForce, maxSpeed, extra);
+        if (avoidance != null)
+        {
+            desiredVelocity = avoidance.SlideDesired(position, desiredVelocity);
+            current = avoidance.StripIntoWalls(position, current);
+        }
+
+        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - current, maxForce);
+        Vector2 velocity = current + steering * deltaTime;
+
+        if (avoidance != null)
+        {
+            velocity += (avoidance.GetForce(position, current, desiredVelocity, maxSpeed)
+                + avoidance.GetSeparationForce(position)) * deltaTime;
+            velocity = avoidance.StripIntoWalls(position, velocity);
+        }
+
+        return Vector2.ClampMagnitude(velocity, maxSpeed);
     }
 
     public static void SetupEnemy(Rigidbody2D rb)
     {
         rb.gravityScale = 0f;
+        rb.freezeRotation = true;
+        rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+        if (_frictionlessMaterial == null)
+            _frictionlessMaterial = new PhysicsMaterial2D { friction = 0f, bounciness = 0f };
+
+        rb.sharedMaterial = _frictionlessMaterial;
     }
 
     public static void Stop(Rigidbody2D rb)
@@ -104,6 +114,7 @@ public static class SteeringMath
     public static Vector2 CollisionAvoidance(
         Vector2 position,
         Vector2 velocity,
+        Vector2 desiredVelocity,
         float maxSpeed,
         float seeAhead,
         float maxAvoidForce,
@@ -111,30 +122,138 @@ public static class SteeringMath
         LayerMask obstacles,
         Collider2D ignore)
     {
-        if (velocity.sqrMagnitude < Epsilon)
+        Vector2 forward = ResolveLookDirection(velocity, desiredVelocity);
+        if (forward.sqrMagnitude < Epsilon)
             return Vector2.zero;
 
-        float speed = velocity.magnitude;
-        Vector2 forward = velocity / speed;
-        float lookDistance = seeAhead * (speed / maxSpeed);
+        float speed = Mathf.Max(velocity.magnitude, desiredVelocity.magnitude);
+        float speedRatio = maxSpeed > Epsilon ? speed / maxSpeed : 1f;
+        float lookDistance = seeAhead * Mathf.Clamp(speedRatio, 0.35f, 1f);
         Vector2 ahead = position + forward * lookDistance;
         Vector2 ahead2 = position + forward * lookDistance * 0.5f;
 
-        Collider2D threat = FindMostThreateningObstacle(
-            position,
-            ahead,
-            ahead2,
-            agentRadius,
-            obstacles,
-            ignore);
-        if (threat == null)
+        if (!FindMostThreateningObstacle(
+                position,
+                ahead,
+                ahead2,
+                forward,
+                lookDistance,
+                agentRadius,
+                obstacles,
+                ignore,
+                out Collider2D threat))
             return Vector2.zero;
 
-        Vector2 avoidance = ahead - (Vector2)threat.bounds.center;
+        Vector2 wallPoint = threat.ClosestPoint(ahead);
+        Vector2 avoidance = ahead - wallPoint;
+        if (avoidance.sqrMagnitude < Epsilon)
+            avoidance = position - threat.ClosestPoint(position);
+
         if (avoidance.sqrMagnitude < Epsilon)
             return Vector2.zero;
 
-        return avoidance.normalized * maxAvoidForce;
+        float penetration = agentRadius - Vector2.Distance(position, threat.ClosestPoint(position));
+        float urgency = 1f + Mathf.Clamp01(penetration / agentRadius);
+        return avoidance.normalized * (maxAvoidForce * urgency);
+    }
+
+    public static Vector2 SlideDesiredAlongWalls(
+        Vector2 position,
+        Vector2 desiredVelocity,
+        float agentRadius,
+        LayerMask obstacles,
+        Collider2D ignore) =>
+        RemoveVelocityIntoWalls(position, desiredVelocity, agentRadius, obstacles, ignore);
+
+    public static Vector2 WallSeparationForce(
+        Vector2 position,
+        float agentRadius,
+        float maxForce,
+        LayerMask obstacles,
+        Collider2D ignore)
+    {
+        Vector2 separation = Vector2.zero;
+        int count = OverlapCircle(position, agentRadius, obstacles, OverlapHits);
+        for (int i = 0; i < count; i++)
+        {
+            Collider2D hit = OverlapHits[i];
+            if (hit == null || hit == ignore)
+                continue;
+
+            Vector2 closest = hit.ClosestPoint(position);
+            Vector2 toAgent = position - closest;
+            float distance = toAgent.magnitude;
+            if (distance >= agentRadius)
+                continue;
+
+            float penetration = agentRadius - distance;
+            Vector2 normal = distance > Epsilon ? toAgent / distance : Vector2.up;
+            separation += normal * (penetration / agentRadius);
+        }
+
+        if (separation.sqrMagnitude < Epsilon)
+            return Vector2.zero;
+
+        return separation.normalized * maxForce;
+    }
+
+    public static Vector2 StripVelocityIntoWalls(
+        Vector2 position,
+        Vector2 velocity,
+        float agentRadius,
+        LayerMask obstacles,
+        Collider2D ignore) =>
+        RemoveVelocityIntoWalls(position, velocity, agentRadius, obstacles, ignore);
+
+    static Vector2 RemoveVelocityIntoWalls(
+        Vector2 position,
+        Vector2 velocity,
+        float agentRadius,
+        LayerMask obstacles,
+        Collider2D ignore)
+    {
+        if (velocity.sqrMagnitude < Epsilon)
+            return velocity;
+
+        Vector2 adjusted = velocity;
+        int count = OverlapCircle(position, agentRadius * 1.02f, obstacles, OverlapHits);
+        for (int i = 0; i < count; i++)
+        {
+            if (!TryGetWallNormal(position, OverlapHits[i], ignore, out Vector2 normal))
+                continue;
+
+            float intoWall = Vector2.Dot(adjusted, -normal);
+            if (intoWall > 0f)
+                adjusted += normal * intoWall;
+        }
+
+        return adjusted;
+    }
+
+    static bool TryGetWallNormal(Vector2 position, Collider2D wall, Collider2D ignore, out Vector2 normal)
+    {
+        normal = Vector2.zero;
+        if (wall == null || wall == ignore)
+            return false;
+
+        Vector2 closest = wall.ClosestPoint(position);
+        Vector2 toAgent = position - closest;
+        if (toAgent.sqrMagnitude < Epsilon)
+            return false;
+
+        normal = toAgent.normalized;
+        return true;
+    }
+
+    static Vector2 ResolveLookDirection(Vector2 velocity, Vector2 desiredVelocity)
+    {
+        if (velocity.sqrMagnitude > Epsilon)
+            return velocity.normalized;
+
+        if (desiredVelocity.sqrMagnitude > Epsilon)
+            return desiredVelocity.normalized;
+
+        return Vector2.zero;
     }
 
     public static Vector2 PredictPosition(
@@ -151,40 +270,70 @@ public static class SteeringMath
         return targetPosition + targetVelocity * lookAheadTime;
     }
 
-    static Collider2D FindMostThreateningObstacle(
+    static bool FindMostThreateningObstacle(
         Vector2 position,
         Vector2 ahead,
         Vector2 ahead2,
+        Vector2 forward,
+        float lookDistance,
         float agentRadius,
         LayerMask obstacles,
-        Collider2D ignore)
+        Collider2D ignore,
+        out Collider2D threat)
     {
         Collider2D closest = null;
         float closestDistanceSq = float.MaxValue;
 
-        ConsiderPoint(position, ref closest, ref closestDistanceSq);
-        ConsiderPoint(ahead, ref closest, ref closestDistanceSq);
-        ConsiderPoint(ahead2, ref closest, ref closestDistanceSq);
+        ConsiderCast();
+        ConsiderPoint(position);
+        ConsiderPoint(ahead);
+        ConsiderPoint(ahead2);
 
-        return closest;
+        threat = closest;
+        return closest != null;
 
-        void ConsiderPoint(Vector2 point, ref Collider2D best, ref float bestDistanceSq)
+        void ConsiderCast()
         {
-            int count = Physics2D.OverlapCircleNonAlloc(point, agentRadius, OverlapHits, obstacles);
-            for (int i = 0; i < count; i++)
-            {
-                Collider2D hit = OverlapHits[i];
-                if (hit == null || hit == ignore)
-                    continue;
+            RaycastHit2D hit = Physics2D.CircleCast(
+                position,
+                agentRadius * 0.95f,
+                forward,
+                lookDistance,
+                obstacles);
+            if (hit.collider == null || hit.collider == ignore)
+                return;
 
-                float distanceSq = (hit.ClosestPoint(position) - position).sqrMagnitude;
-                if (distanceSq < bestDistanceSq)
-                {
-                    bestDistanceSq = distanceSq;
-                    best = hit;
-                }
+            Register(hit.collider);
+        }
+
+        void ConsiderPoint(Vector2 point)
+        {
+            int count = OverlapCircle(point, agentRadius, obstacles, OverlapHits);
+            for (int i = 0; i < count; i++)
+                Register(OverlapHits[i]);
+        }
+
+        void Register(Collider2D hit)
+        {
+            if (hit == null || hit == ignore)
+                return;
+
+            float distanceSq = (hit.ClosestPoint(position) - position).sqrMagnitude;
+            if (distanceSq < closestDistanceSq)
+            {
+                closestDistanceSq = distanceSq;
+                closest = hit;
             }
         }
+    }
+
+    static int OverlapCircle(Vector2 point, float radius, LayerMask layers, Collider2D[] buffer)
+    {
+        ContactFilter2D filter = default;
+        filter.useLayerMask = true;
+        filter.SetLayerMask(layers);
+        filter.useTriggers = false;
+        return Physics2D.OverlapCircle(point, radius, filter, buffer);
     }
 
     public static void ResizeCircle(Transform circle, float radius)

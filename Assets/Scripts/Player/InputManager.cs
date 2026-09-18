@@ -11,17 +11,21 @@ public class InputManager : MonoBehaviour
 
     [SerializeField] InputActionAsset inputActions;
 
-    InputActionMap _playerMap;
+    InputActionAsset _runtimeActions;
     InputAction _moveAction;
+    bool _ownsActionLifecycle;
 
     void Awake()
     {
         PlayerInput playerInput = GetComponent<PlayerInput>();
-        InputActionAsset actions = playerInput != null
-            ? playerInput.actions
-            : inputActions;
+        if (playerInput != null)
+        {
+            _moveAction = playerInput.actions.FindAction("Player/Move", true);
+            _ownsActionLifecycle = false;
+            return;
+        }
 
-        if (actions == null)
+        if (inputActions == null)
         {
             Debug.LogError(
                 "InputManager requires a PlayerInput component or an assigned Input Actions asset.",
@@ -29,19 +33,28 @@ public class InputManager : MonoBehaviour
             return;
         }
 
-        _playerMap = actions.FindActionMap("Player", true);
-        _moveAction = _playerMap.FindAction("Move", true);
-    }
-
-    void OnEnable()
-    {
-        _playerMap?.Enable();
+        _runtimeActions = Instantiate(inputActions);
+        _moveAction = _runtimeActions.FindAction("Player/Move", true);
+        _moveAction.Enable();
+        _ownsActionLifecycle = true;
     }
 
     void OnDisable()
     {
-        _playerMap?.Disable();
         Movement = Vector2.zero;
+    }
+
+    void OnDestroy()
+    {
+        Movement = Vector2.zero;
+
+        if (!_ownsActionLifecycle || _moveAction == null)
+            return;
+
+        _moveAction.Disable();
+
+        if (_runtimeActions != null)
+            Destroy(_runtimeActions);
     }
 
     void Update()

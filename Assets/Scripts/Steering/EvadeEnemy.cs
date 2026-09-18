@@ -4,63 +4,43 @@ using UnityEngine;
 /// Evade — flee the player's predicted position (same lookahead as pursue).
 /// Only active inside evade range.
 /// </summary>
-[RequireComponent(typeof(Rigidbody2D))]
-public class EvadeEnemy : MonoBehaviour
+public class EvadeEnemy : SteeringEnemyBase
 {
-    [Header("Target")]
-    [SerializeField] Transform player;
-
     [Header("Evade Range")]
     [SerializeField] Transform evadeRangeCircle;
     [SerializeField] float evadeRange = 5f;
 
-    [Header("Movement")]
-    [SerializeField] float maxSpeed = 3f;
-    [SerializeField] float maxForce = 6f;
+    [Header("Prediction")]
     [SerializeField] float targetMaxSpeed = 5f;
 
-    Rigidbody2D _rb;
     Rigidbody2D _playerRb;
-    SteeringCollisionAvoidance _avoidance;
 
-    void Awake()
+    protected override void Awake()
     {
-        _rb = GetComponent<Rigidbody2D>();
-        _avoidance = GetComponent<SteeringCollisionAvoidance>();
-        SteeringMath.SetupEnemy(_rb);
-        SteeringMath.ResizeCircle(evadeRangeCircle, evadeRange);
+        base.Awake();
         if (player != null)
             _playerRb = player.GetComponent<Rigidbody2D>();
     }
 
-    void OnValidate()
-    {
+    protected override void RefreshRangeVisuals() =>
         SteeringMath.ResizeCircle(evadeRangeCircle, evadeRange);
-    }
 
-    void FixedUpdate()
+    protected override bool TryGetDesiredVelocity(out Vector2 desired)
     {
-        if (player == null)
-            return;
-
-        if (SteeringMath.IsOutOfRange(_rb.position, player.position, evadeRange))
+        if (SteeringMath.IsOutOfRange(Body.position, player.position, evadeRange))
         {
-            SteeringMath.Stop(_rb);
-            return;
+            desired = default;
+            return false;
         }
 
         Vector2 targetVelocity = _playerRb != null ? _playerRb.linearVelocity : Vector2.zero;
-        Vector2 predictedPosition = SteeringMath.PredictPosition(
-            _rb.position,
+        Vector2 predicted = SteeringMath.PredictPosition(
+            Body.position,
             player.position,
             targetVelocity,
             targetMaxSpeed);
 
-        _rb.linearVelocity = SteeringMath.Steer(
-            _rb,
-            SteeringMath.FleeVelocity(_rb.position, predictedPosition, maxSpeed),
-            maxForce,
-            maxSpeed,
-            _avoidance);
+        desired = SteeringMath.FleeVelocity(Body.position, predicted, maxSpeed);
+        return true;
     }
 }

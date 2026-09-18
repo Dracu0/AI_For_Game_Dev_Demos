@@ -10,20 +10,9 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] float moveSpeed = 5f;
 
     Rigidbody2D _rb;
-    Vector2 _movement;
 
-    void Awake()
-    {
-        _rb = GetComponent<Rigidbody2D>();
-    }
+    void Awake() => _rb = GetComponent<Rigidbody2D>();
 
-    void Update()
-    {
-        _movement = InputManager.Movement;
-    }
-
-    void FixedUpdate()
-    {
-        _rb.linearVelocity = _movement * moveSpeed;
-    }
+    void FixedUpdate() =>
+        _rb.linearVelocity = InputManager.Movement * moveSpeed;
 }
