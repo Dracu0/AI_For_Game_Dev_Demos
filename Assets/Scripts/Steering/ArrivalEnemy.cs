@@ -1,9 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// Arrival — seek at full speed, then ramp down inside slowRadius (distance / slowRadius).
-/// Only active inside detection range.
-/// </summary>
+/// <summary>Slow down as the player is reached. Active inside detection range.</summary>
 public class ArrivalEnemy : SteeringEnemyBase
 {
     [Header("Detection")]

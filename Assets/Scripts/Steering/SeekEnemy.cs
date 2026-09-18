@@ -1,9 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// Seek — desiredVelocity = normalize(target - position) * maxSpeed.
-/// Only active inside seek range.
-/// </summary>
+/// <summary>Chase the player at full speed. Active inside seek range.</summary>
 public class SeekEnemy : SteeringEnemyBase
 {
     [Header("Seek Range")]
@@ -15,7 +12,7 @@ public class SeekEnemy : SteeringEnemyBase
 
     protected override bool TryGetDesiredVelocity(out Vector2 desired)
     {
-        if (SteeringMath.IsOutOfRange(Body.position, player.position, seekRange))
+        if (IsPlayerBeyondRange(seekRange))
         {
             desired = default;
             return false;

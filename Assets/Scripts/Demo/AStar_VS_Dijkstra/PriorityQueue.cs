@@ -16,7 +16,7 @@ namespace Pathfinding
             public TItem Item;
         }
 
-        readonly List<Entry> _items = new List<Entry>();
+        readonly List<Entry> _items = new();
         long _order;
 
         public bool IsEmpty => _items.Count == 0;

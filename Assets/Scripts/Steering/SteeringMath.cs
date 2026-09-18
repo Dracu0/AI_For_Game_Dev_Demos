@@ -1,17 +1,7 @@
 // ReSharper disable CheckNamespace
 using UnityEngine;
 
-/// <summary>
-/// Shared steering math used by every steering behaviour.
-///
-/// Core formula (same in every behaviour):
-///   steering = desiredVelocity - currentVelocity
-///   velocity += steering * deltaTime
-///
-/// Behaviour scripts pick desiredVelocity using SeekVelocity, FleeVelocity,
-/// ArrivalVelocity, or PredictPosition, then apply it with Steer.
-/// Optional collision avoidance: steering += avoidance force, then clip into-wall motion.
-/// </summary>
+/// <summary>Shared steering helpers: desired velocity, integration, optional collision avoidance.</summary>
 public static class SteeringMath
 {
     public const float Epsilon = 0.0001f;

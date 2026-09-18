@@ -1,8 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Shared setup and physics steering for range-based enemy behaviours.
-/// Subclasses only define when to move and what desired velocity to use.
+/// Range-based steering enemies: subclasses supply desired velocity; this class handles physics.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public abstract class SteeringEnemyBase : MonoBehaviour
@@ -15,6 +14,7 @@ public abstract class SteeringEnemyBase : MonoBehaviour
     [SerializeField] protected float maxForce = 6f;
 
     Rigidbody2D _rb;
+    Rigidbody2D _playerRb;
     SteeringCollisionAvoidance _avoidance;
 
     protected Rigidbody2D Body => _rb;
@@ -24,16 +24,29 @@ public abstract class SteeringEnemyBase : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
         _avoidance = GetComponent<SteeringCollisionAvoidance>();
         SteeringMath.SetupEnemy(_rb);
+        CachePlayerRigidbody();
         RefreshRangeVisuals();
     }
 
     protected virtual void OnValidate() => RefreshRangeVisuals();
 
-    /// <summary>Resize optional range gizmos in the editor and at runtime.</summary>
     protected abstract void RefreshRangeVisuals();
-
-    /// <summary>Return false to stop; true to steer toward desired.</summary>
     protected abstract bool TryGetDesiredVelocity(out Vector2 desired);
+
+    protected bool IsPlayerBeyondRange(float range) =>
+        SteeringMath.IsOutOfRange(Body.position, player.position, range);
+
+    protected Vector2 PredictPlayerPosition(float targetMaxSpeed)
+    {
+        Vector2 playerVelocity = _playerRb != null ? _playerRb.linearVelocity : Vector2.zero;
+        return SteeringMath.PredictPosition(Body.position, player.position, playerVelocity, targetMaxSpeed);
+    }
+
+    void CachePlayerRigidbody()
+    {
+        if (player != null)
+            _playerRb = player.GetComponent<Rigidbody2D>();
+    }
 
     void FixedUpdate()
     {

@@ -1,9 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// Applies InputManager.Movement to this object's Rigidbody2D.
-/// Reads input in Update, then moves in FixedUpdate.
-/// </summary>
+/// <summary>Applies InputManager.Movement to this object's Rigidbody2D in FixedUpdate.</summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerMovement : MonoBehaviour
 {

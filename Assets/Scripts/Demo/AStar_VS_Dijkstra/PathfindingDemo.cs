@@ -15,10 +15,6 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class PathfindingDemo : MonoBehaviour
 {
-    // ------------------------------------------------------------------
-    // Demo flow state
-    // ------------------------------------------------------------------
-
     enum DemoPhase
     {
         Editing,
@@ -26,10 +22,6 @@ public class PathfindingDemo : MonoBehaviour
         WaitingForStats,
         ShowingStats
     }
-
-    // ------------------------------------------------------------------
-    // Inspector settings
-    // ------------------------------------------------------------------
 
     [Header("Scene")]
     [SerializeField] Grid grid;
@@ -51,10 +43,6 @@ public class PathfindingDemo : MonoBehaviour
     [Header("Animation")]
     [SerializeField] float stepDelay = 0.03f;
 
-    // ------------------------------------------------------------------
-    // Runtime state
-    // ------------------------------------------------------------------
-
     readonly Dictionary<Vector2Int, SpriteRenderer> _cells = new Dictionary<Vector2Int, SpriteRenderer>();
     readonly HashSet<Vector2Int> _obstacles = new HashSet<Vector2Int>();
 
@@ -68,10 +56,6 @@ public class PathfindingDemo : MonoBehaviour
     Transform _cellsParent;
     Camera _camera;
     bool _animating;
-
-    // ------------------------------------------------------------------
-    // Unity lifecycle
-    // ------------------------------------------------------------------
 
     void Awake()
     {
@@ -114,10 +98,6 @@ public class PathfindingDemo : MonoBehaviour
         if (Mouse.current.rightButton.wasPressedThisFrame)
             HandleRightClick();
     }
-
-    // ------------------------------------------------------------------
-    // Demo sequence (Space key)
-    // ------------------------------------------------------------------
 
     void HandleSpacePressed()
     {
@@ -204,10 +184,6 @@ public class PathfindingDemo : MonoBehaviour
         return $"{name}: no path | {result.NodesExpanded} tiles searched";
     }
 
-    // ------------------------------------------------------------------
-    // Scene setup
-    // ------------------------------------------------------------------
-
     bool ValidateSetup()
     {
         if (grid == null || tilePrefab == null)
@@ -267,10 +243,6 @@ public class PathfindingDemo : MonoBehaviour
         _camera.transform.position = new Vector3(center.x, center.y, -10f);
         _camera.orthographicSize = gridHeight * 0.5f + 1.5f;
     }
-
-    // ------------------------------------------------------------------
-    // Player input
-    // ------------------------------------------------------------------
 
     bool CanEditMap() =>
         _phase == DemoPhase.Editing || _phase == DemoPhase.ShowingStats;
@@ -364,10 +336,6 @@ public class PathfindingDemo : MonoBehaviour
         return true;
     }
 
-    // ------------------------------------------------------------------
-    // Search visualization
-    // ------------------------------------------------------------------
-
     IEnumerator AnimateSearch(SearchResult result)
     {
         foreach (Vector2Int cell in result.ExpansionOrder)
@@ -417,10 +385,6 @@ public class PathfindingDemo : MonoBehaviour
             renderer.color = color;
     }
 
-    // ------------------------------------------------------------------
-    // Grid model sync
-    // ------------------------------------------------------------------
-
     void RebuildGridData()
     {
         _gridData = new Grid2D(gridWidth, gridHeight);
@@ -448,10 +412,6 @@ public class PathfindingDemo : MonoBehaviour
 
     Vector3 CellToWorld(Vector2Int cell) =>
         grid.GetCellCenterWorld(new Vector3Int(cell.x, cell.y, 0));
-
-    // ------------------------------------------------------------------
-    // UI
-    // ------------------------------------------------------------------
 
     void SetStatus(string message) => DemoInput.SetStatus(statusText, message);
 }

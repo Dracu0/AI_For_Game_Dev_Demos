@@ -1,9 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// Flee — desiredVelocity = -seek (away from the player).
-/// Only active inside flee range.
-/// </summary>
+/// <summary>Run from the player. Active inside flee range.</summary>
 public class FleeEnemy : SteeringEnemyBase
 {
     [Header("Flee Range")]
@@ -15,7 +12,7 @@ public class FleeEnemy : SteeringEnemyBase
 
     protected override bool TryGetDesiredVelocity(out Vector2 desired)
     {
-        if (SteeringMath.IsOutOfRange(Body.position, player.position, fleeRange))
+        if (IsPlayerBeyondRange(fleeRange))
         {
             desired = default;
             return false;

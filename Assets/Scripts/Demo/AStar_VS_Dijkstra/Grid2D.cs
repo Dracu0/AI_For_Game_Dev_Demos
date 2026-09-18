@@ -4,17 +4,12 @@ using UnityEngine;
 namespace Pathfinding
 {
     /// <summary>
-    /// Pure grid data model used by the search algorithms.
-    /// Independent of Unity rendering so it can be tested in isolation.
-    /// Coordinate convention: index = y * Width + x, (0,0) is the bottom-left.
-    /// Movement is 8-directional (cardinals + diagonals) with integer step costs (1 / 2).
-    /// Diagonal steps are allowed through gaps between walls, but not through single-wall corners.
+    /// Walkability grid for pathfinding demos. (0,0) is bottom-left; moves are 8-way with costs 1 / 2.
     /// </summary>
     public class Grid2D
     {
         public int Width { get; }
         public int Height { get; }
-        public int CellCount => Width * Height;
 
         readonly bool[] _walkable;
 
@@ -38,14 +33,6 @@ namespace Pathfinding
         {
             if (InBounds(x, y))
                 _walkable[y * Width + x] = walkable;
-        }
-
-        public int IndexOf(int x, int y) => y * Width + x;
-
-        public void GetCoords(int index, out int x, out int y)
-        {
-            x = index % Width;
-            y = index / Width;
         }
 
         public List<Vector2Int> GetWalkableNeighbours(Vector2Int cell)
@@ -79,8 +66,6 @@ namespace Pathfinding
             bool cardinalX = IsWalkable(from.x, y);
             bool cardinalY = IsWalkable(x, from.y);
 
-            // Allow diagonals through gaps where both cardinals are walls.
-            // Block only when exactly one cardinal is blocked (corner-cutting).
             if (cardinalX != cardinalY)
                 return;
 
