@@ -1,19 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// Arrival — reach the player and stop smoothly.
-///
-/// Goal: move toward the player without overshooting.
-///
-/// Outside detection range: stop (idle).
-/// Far but inside detection: full speed toward the player.
-/// Inside slow radius: speed scales down with distance.
-/// Inside stopping distance: stop.
-///
-/// Use when: enemy or NPC should walk up to the player and halt
-/// (guard, shopkeeper, ally).
-///
-/// vs Seek: arrival slows down near the target; seek does not.
+/// Arrival — seek at full speed, then ramp down inside slowRadius (distance / slowRadius).
+/// Only active inside detection range.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class ArrivalEnemy : MonoBehaviour
@@ -28,7 +17,6 @@ public class ArrivalEnemy : MonoBehaviour
     [Header("Arrival")]
     [SerializeField] Transform slowRadiusCircle;
     [SerializeField] float slowRadius = 3f;
-    [SerializeField] float stoppingDistance = 0.25f;
 
     [Header("Movement")]
     [SerializeField] float maxSpeed = 3f;
@@ -54,7 +42,7 @@ public class ArrivalEnemy : MonoBehaviour
             return;
 
         float distance = Vector2.Distance(_rb.position, player.position);
-        if (SteeringMath.IsOutOfRange(_rb.position, player.position, detectionRange))
+        if (distance > detectionRange)
         {
             SteeringMath.Stop(_rb);
             return;
@@ -65,8 +53,7 @@ public class ArrivalEnemy : MonoBehaviour
             player.position,
             distance,
             maxSpeed,
-            slowRadius,
-            stoppingDistance);
+            slowRadius);
         _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
     }
 

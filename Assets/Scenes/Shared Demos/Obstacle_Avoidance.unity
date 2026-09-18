@@ -615,7 +615,6 @@ MonoBehaviour:
   detectionRange: 4
   slowRadiusCircle: {fileID: 1157939468}
   slowRadius: 4
-  stoppingDistance: 0.25
   maxSpeed: 3
   maxForce: 6
 --- !u!1 &519420028

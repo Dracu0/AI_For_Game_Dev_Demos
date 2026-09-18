@@ -1,18 +1,18 @@
 using UnityEngine;
 
 /// <summary>
-/// Pursue — seek the player's predicted position (lookahead T = distance / targetMaxSpeed).
-/// Only active inside pursue range.
+/// Evade — flee the player's predicted position (same lookahead as pursue).
+/// Only active inside evade range.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
-public class PursueEnemy : MonoBehaviour
+public class EvadeEnemy : MonoBehaviour
 {
     [Header("Target")]
     [SerializeField] Transform player;
 
-    [Header("Pursue Range")]
-    [SerializeField] Transform pursueRangeCircle;
-    [SerializeField] float pursueRange = 8f;
+    [Header("Evade Range")]
+    [SerializeField] Transform evadeRangeCircle;
+    [SerializeField] float evadeRange = 5f;
 
     [Header("Movement")]
     [SerializeField] float maxSpeed = 3f;
@@ -26,14 +26,14 @@ public class PursueEnemy : MonoBehaviour
     {
         _rb = GetComponent<Rigidbody2D>();
         SteeringMath.SetupEnemy(_rb);
-        SteeringMath.ResizeCircle(pursueRangeCircle, pursueRange);
+        SteeringMath.ResizeCircle(evadeRangeCircle, evadeRange);
         if (player != null)
             _playerRb = player.GetComponent<Rigidbody2D>();
     }
 
     void OnValidate()
     {
-        SteeringMath.ResizeCircle(pursueRangeCircle, pursueRange);
+        SteeringMath.ResizeCircle(evadeRangeCircle, evadeRange);
     }
 
     void FixedUpdate()
@@ -41,7 +41,7 @@ public class PursueEnemy : MonoBehaviour
         if (player == null)
             return;
 
-        if (SteeringMath.IsOutOfRange(_rb.position, player.position, pursueRange))
+        if (SteeringMath.IsOutOfRange(_rb.position, player.position, evadeRange))
         {
             SteeringMath.Stop(_rb);
             return;
@@ -56,7 +56,7 @@ public class PursueEnemy : MonoBehaviour
 
         _rb.linearVelocity = SteeringMath.Steer(
             _rb,
-            SteeringMath.SeekVelocity(_rb.position, predictedPosition, maxSpeed),
+            SteeringMath.FleeVelocity(_rb.position, predictedPosition, maxSpeed),
             maxForce,
             maxSpeed);
     }

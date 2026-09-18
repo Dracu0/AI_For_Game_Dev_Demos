@@ -62,19 +62,15 @@ public static class SteeringMath
         Direction(from, to) * maxSpeed;
 
     public static Vector2 FleeVelocity(Vector2 from, Vector2 threat, float maxSpeed) =>
-        Direction(threat, from) * maxSpeed;
+        -SeekVelocity(from, threat, maxSpeed);
 
     public static Vector2 ArrivalVelocity(
         Vector2 from,
         Vector2 to,
         float distance,
         float maxSpeed,
-        float slowRadius,
-        float stoppingDistance)
+        float slowRadius)
     {
-        if (distance < stoppingDistance)
-            return Vector2.zero;
-
         Vector2 direction = Direction(from, to);
         if (distance < slowRadius)
             return direction * (maxSpeed * (distance / slowRadius));
@@ -83,29 +79,17 @@ public static class SteeringMath
     }
 
     public static Vector2 PredictPosition(
-        Vector2 chaserPosition,
+        Vector2 agentPosition,
         Vector2 targetPosition,
         Vector2 targetVelocity,
-        float maxSpeed)
+        float targetMaxSpeed)
     {
-        if (targetVelocity.sqrMagnitude < Epsilon)
+        if (targetMaxSpeed < Epsilon)
             return targetPosition;
 
-        float distance = Vector2.Distance(chaserPosition, targetPosition);
-        float lookAheadTime = distance / maxSpeed;
+        float distance = Vector2.Distance(agentPosition, targetPosition);
+        float lookAheadTime = distance / targetMaxSpeed;
         return targetPosition + targetVelocity * lookAheadTime;
-    }
-
-    public static void SteerIfMoving(
-        Rigidbody2D rb,
-        Vector2 desiredVelocity,
-        float maxForce,
-        float maxSpeed)
-    {
-        if (desiredVelocity.sqrMagnitude < Epsilon)
-            return;
-
-        rb.linearVelocity = Steer(rb, desiredVelocity, maxForce, maxSpeed);
     }
 
     public static void ResizeCircle(Transform circle, float radius)
