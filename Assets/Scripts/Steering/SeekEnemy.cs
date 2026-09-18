@@ -19,10 +19,12 @@ public class SeekEnemy : MonoBehaviour
     [SerializeField] float maxForce = 6f;
 
     Rigidbody2D _rb;
+    SteeringCollisionAvoidance _avoidance;
 
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
+        _avoidance = GetComponent<SteeringCollisionAvoidance>();
         SteeringMath.SetupEnemy(_rb);
         SteeringMath.ResizeCircle(seekRangeCircle, seekRange);
     }
@@ -47,6 +49,7 @@ public class SeekEnemy : MonoBehaviour
             _rb,
             SteeringMath.SeekVelocity(_rb.position, player.position, maxSpeed),
             maxForce,
-            maxSpeed);
+            maxSpeed,
+            _avoidance);
     }
 }

@@ -23,10 +23,12 @@ public class ArrivalEnemy : MonoBehaviour
     [SerializeField] float maxForce = 6f;
 
     Rigidbody2D _rb;
+    SteeringCollisionAvoidance _avoidance;
 
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
+        _avoidance = GetComponent<SteeringCollisionAvoidance>();
         SteeringMath.SetupEnemy(_rb);
         UpdateRangeCircles();
     }
@@ -54,7 +56,7 @@ public class ArrivalEnemy : MonoBehaviour
             distance,
             maxSpeed,
             slowRadius);
-        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed);
+        _rb.linearVelocity = SteeringMath.Steer(_rb, desiredVelocity, maxForce, maxSpeed, _avoidance);
     }
 
     void UpdateRangeCircles()

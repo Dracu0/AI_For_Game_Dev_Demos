@@ -21,10 +21,12 @@ public class EvadeEnemy : MonoBehaviour
 
     Rigidbody2D _rb;
     Rigidbody2D _playerRb;
+    SteeringCollisionAvoidance _avoidance;
 
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
+        _avoidance = GetComponent<SteeringCollisionAvoidance>();
         SteeringMath.SetupEnemy(_rb);
         SteeringMath.ResizeCircle(evadeRangeCircle, evadeRange);
         if (player != null)
@@ -58,6 +60,7 @@ public class EvadeEnemy : MonoBehaviour
             _rb,
             SteeringMath.FleeVelocity(_rb.position, predictedPosition, maxSpeed),
             maxForce,
-            maxSpeed);
+            maxSpeed,
+            _avoidance);
     }
 }
