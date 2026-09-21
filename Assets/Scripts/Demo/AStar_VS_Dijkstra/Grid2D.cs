@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -19,9 +20,7 @@ namespace Pathfinding
             Width = width;
             Height = height;
             _walkable = new bool[width * height];
-
-            for (int i = 0; i < _walkable.Length; i++)
-                _walkable[i] = true;
+            Array.Fill(_walkable, true);
         }
 
         public bool InBounds(int x, int y) =>

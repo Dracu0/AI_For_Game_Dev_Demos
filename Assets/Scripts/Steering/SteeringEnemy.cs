@@ -49,18 +49,11 @@ public class SteeringEnemy : MonoBehaviour
         RefreshRangeVisuals();
     }
 
-    public void SetRangeVisuals(Transform range, Transform slow = null)
-    {
-        rangeCircle = range;
-        slowRadiusCircle = slow;
-        RefreshRangeVisuals();
-    }
-
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();
         _avoidance = GetComponent<SteeringCollisionAvoidance>();
-        SteeringMath.SetupEnemy(_rb);
+        SteeringMath.SetupBody(_rb);
         CachePlayerRigidbody();
         RefreshRangeVisuals();
     }
@@ -103,8 +96,7 @@ public class SteeringEnemy : MonoBehaviour
                 return true;
 
             case SteeringMode.Arrival:
-                desired = SteeringMath.ArrivalVelocity(
-                    from, to, Vector2.Distance(from, to), maxSpeed, slowRadius);
+                desired = SteeringMath.ArrivalVelocity(from, to, maxSpeed, slowRadius);
                 return true;
 
             case SteeringMode.Pursue:
@@ -129,12 +121,28 @@ public class SteeringEnemy : MonoBehaviour
 
     void RefreshRangeVisuals()
     {
-        SteeringMath.ResizeCircle(rangeCircle, range);
+        ResizeCircle(rangeCircle, range);
 
         if (slowRadiusCircle == null || slowRadiusCircle == rangeCircle)
             return;
 
-        SteeringMath.ResizeCircle(slowRadiusCircle, slowRadius);
+        ResizeCircle(slowRadiusCircle, slowRadius);
+    }
+
+    static void ResizeCircle(Transform circle, float radius)
+    {
+        if (circle == null)
+            return;
+
+        SpriteRenderer sprite = circle.GetComponent<SpriteRenderer>();
+        if (sprite == null || sprite.sprite == null)
+            return;
+
+        float diameter = sprite.sprite.bounds.size.x;
+        if (diameter <= 0f)
+            return;
+
+        circle.localScale = Vector3.one * (radius * 2f / diameter);
     }
 
     void CachePlayerRigidbody()

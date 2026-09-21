@@ -20,21 +20,9 @@ public static class SteeringMath
     }
 
     /// <summary>
-    /// steering = clamp(desired - current, maxForce)
-    /// newVelocity = clamp(current + steering * dt, maxSpeed)
+    /// steering = clamp(desired - velocity + avoidance, maxForce)
+    /// velocity = clamp(velocity + steering * dt, maxSpeed)
     /// </summary>
-    public static Vector2 ApplySteering(
-        Vector2 currentVelocity,
-        Vector2 desiredVelocity,
-        float maxForce,
-        float maxSpeed,
-        float deltaTime)
-    {
-        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - currentVelocity, maxForce);
-        return Vector2.ClampMagnitude(currentVelocity + steering * deltaTime, maxSpeed);
-    }
-
-    /// <summary>Apply steering through a Rigidbody2D (used by enemy scripts).</summary>
     public static Vector2 Steer(
         Rigidbody2D rb,
         Vector2 desiredVelocity,
@@ -61,7 +49,7 @@ public static class SteeringMath
         return Vector2.ClampMagnitude(velocity, maxSpeed);
     }
 
-    public static void SetupEnemy(Rigidbody2D rb)
+    public static void SetupBody(Rigidbody2D rb)
     {
         rb.gravityScale = 0f;
         rb.freezeRotation = true;
@@ -87,15 +75,15 @@ public static class SteeringMath
     public static Vector2 FleeVelocity(Vector2 from, Vector2 threat, float maxSpeed) =>
         -SeekVelocity(from, threat, maxSpeed);
 
-    public static Vector2 ArrivalVelocity(
-        Vector2 from,
-        Vector2 to,
-        float distance,
-        float maxSpeed,
-        float slowRadius)
+    public static Vector2 ArrivalVelocity(Vector2 from, Vector2 to, float maxSpeed, float slowRadius)
     {
-        Vector2 direction = Direction(from, to);
-        if (distance < slowRadius)
+        Vector2 offset = to - from;
+        float distance = offset.magnitude;
+        if (distance < Epsilon)
+            return Vector2.zero;
+
+        Vector2 direction = offset / distance;
+        if (slowRadius > Epsilon && distance < slowRadius)
             return direction * (maxSpeed * (distance / slowRadius));
 
         return direction * maxSpeed;
@@ -113,21 +101,5 @@ public static class SteeringMath
         float distance = Vector2.Distance(agentPosition, targetPosition);
         float lookAheadTime = distance / targetMaxSpeed;
         return targetPosition + targetVelocity * lookAheadTime;
-    }
-
-    public static void ResizeCircle(Transform circle, float radius)
-    {
-        if (circle == null)
-            return;
-
-        SpriteRenderer sprite = circle.GetComponent<SpriteRenderer>();
-        if (sprite == null || sprite.sprite == null)
-            return;
-
-        float diameter = sprite.sprite.bounds.size.x;
-        if (diameter <= 0f)
-            return;
-
-        circle.localScale = Vector3.one * (radius * 2f / diameter);
     }
 }

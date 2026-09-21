@@ -31,6 +31,7 @@ namespace Pathfinding
     /// </summary>
     public static class PathSolver
     {
+        // Bigger than any path on the teaching grid, and small enough that adding a step cannot overflow.
         const int Unreachable = int.MaxValue / 4;
         const int CardinalStepCost = 1;
         const int DiagonalStepCost = 2;

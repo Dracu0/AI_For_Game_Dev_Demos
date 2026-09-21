@@ -21,26 +21,27 @@ public class DropDownHandler : MonoBehaviour
     [SerializeField] int minBuildIndex;
 
     readonly List<string> scenePaths = new List<string>();
+    TMP_Dropdown _dropdown;
 
     void Start()
     {
-        TMP_Dropdown dropdown = GetComponent<TMP_Dropdown>();
-        if (dropdown == null)
+        _dropdown = GetComponent<TMP_Dropdown>();
+        if (_dropdown == null)
             return;
 
-        dropdown.options.Clear();
+        _dropdown.options.Clear();
         scenePaths.Clear();
 
         foreach (string path in GetBuildScenePaths())
         {
             scenePaths.Add(path);
-            dropdown.options.Add(new TMP_Dropdown.OptionData(
+            _dropdown.options.Add(new TMP_Dropdown.OptionData(
                 FormatSceneName(Path.GetFileNameWithoutExtension(path))));
         }
 
-        dropdown.RefreshShownValue();
-        dropdown.onValueChanged.AddListener(_ => ShowSelected(dropdown));
-        ShowSelected(dropdown);
+        _dropdown.RefreshShownValue();
+        _dropdown.onValueChanged.AddListener(OnSelectionChanged);
+        ShowSelected();
 
         if (loadButton != null)
             loadButton.onClick.AddListener(LoadSelectedScene);
@@ -48,6 +49,9 @@ public class DropDownHandler : MonoBehaviour
 
     void OnDestroy()
     {
+        if (_dropdown != null)
+            _dropdown.onValueChanged.RemoveListener(OnSelectionChanged);
+
         if (loadButton != null)
             loadButton.onClick.RemoveListener(LoadSelectedScene);
     }
@@ -88,11 +92,10 @@ public class DropDownHandler : MonoBehaviour
 
     void LoadSelectedScene()
     {
-        TMP_Dropdown dropdown = GetComponent<TMP_Dropdown>();
-        if (dropdown == null || scenePaths.Count == 0)
+        if (_dropdown == null || scenePaths.Count == 0)
             return;
 
-        int index = dropdown.value;
+        int index = _dropdown.value;
         if (index < 0 || index >= scenePaths.Count)
             return;
 
@@ -102,9 +105,13 @@ public class DropDownHandler : MonoBehaviour
     static string FormatSceneName(string sceneName) =>
         sceneName.Replace('_', ' ');
 
-    void ShowSelected(TMP_Dropdown dropdown)
+    void OnSelectionChanged(int _) => ShowSelected();
+
+    void ShowSelected()
     {
-        if (TextBox == null || dropdown.options.Count == 0)
+        if (TextBox == null || _dropdown == null || _dropdown.options.Count == 0)
             return;
+
+        TextBox.text = _dropdown.options[_dropdown.value].text;
     }
 }
