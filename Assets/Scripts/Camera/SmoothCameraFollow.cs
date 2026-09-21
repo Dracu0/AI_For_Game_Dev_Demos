@@ -20,10 +20,7 @@ public class SmoothCameraFollow : MonoBehaviour
         if (target != null)
             return;
 
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player == null)
-            player = GameObject.Find("Player");
-
+        GameObject player = GameObject.Find("Player");
         if (player != null)
             target = player.transform;
     }

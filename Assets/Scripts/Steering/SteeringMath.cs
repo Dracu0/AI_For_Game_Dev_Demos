@@ -1,7 +1,9 @@
-// ReSharper disable CheckNamespace
 using UnityEngine;
 
-/// <summary>Shared steering helpers: desired velocity, integration, optional collision avoidance.</summary>
+/// <summary>
+/// Shared steering formulas. SteeringEnemy picks a desired velocity;
+/// this class turns that into a new velocity (and optional avoidance).
+/// </summary>
 public static class SteeringMath
 {
     public const float Epsilon = 0.0001f;
@@ -17,7 +19,10 @@ public static class SteeringMath
         return offset.normalized;
     }
 
-    /// <summary>Apply the steering formula to a velocity value.</summary>
+    /// <summary>
+    /// steering = clamp(desired - current, maxForce)
+    /// newVelocity = clamp(current + steering * dt, maxSpeed)
+    /// </summary>
     public static Vector2 ApplySteering(
         Vector2 currentVelocity,
         Vector2 desiredVelocity,

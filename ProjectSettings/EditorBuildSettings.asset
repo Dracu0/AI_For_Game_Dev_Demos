@@ -17,6 +17,27 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Shared Demos/Dijkstra_VS_AStar.unity
     guid: b2961dae8401fc14b8ff755b583bedf8
+  - enabled: 1
+    path: Assets/Scenes/Independent Systems/Seek.unity
+    guid: 005d08670382e19468b6d830bed9cb78
+  - enabled: 1
+    path: Assets/Scenes/Independent Systems/Flee.unity
+    guid: 339c3a9de1418a44f8bb7c81a9168d37
+  - enabled: 1
+    path: Assets/Scenes/Independent Systems/Arrival.unity
+    guid: bc56fe0f3923a184d81ea7bb1510635f
+  - enabled: 1
+    path: Assets/Scenes/Independent Systems/Pursue.unity
+    guid: c44632573b0b3424bb21d53b35c9c645
+  - enabled: 1
+    path: Assets/Scenes/Independent Systems/ObstacleAvoidance.unity
+    guid: e55f68204ba39444f8b078e5eb9c3c25
+  - enabled: 1
+    path: Assets/Scenes/Independent Systems/AStar.unity
+    guid: ecba5f95b52b97d499e9a5c6b88260c1
+  - enabled: 1
+    path: Assets/Scenes/Independent Systems/Dijkstra.unity
+    guid: 7e01c88e721d3b34ea8c1360edb1fa02
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2f6852c84bf8c344788805cb8bca4477, type: 3}
   m_UseUCBPForAssetBundles: 0

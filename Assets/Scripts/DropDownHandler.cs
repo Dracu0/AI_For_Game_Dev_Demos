@@ -11,7 +11,7 @@ using UnityEditor.Build.Profile;
 #endif
 
 /// <summary>
-/// Fills a TMP dropdown with scene names from the active build profile, in build order.
+/// Main-menu scene picker. Not part of the AI lessons — students can skip this file.
 /// </summary>
 public class DropDownHandler : MonoBehaviour
 {
@@ -20,7 +20,7 @@ public class DropDownHandler : MonoBehaviour
     [Tooltip("First build index to include. 1 skips index 0, 2 skips indexes 0 and 1.")]
     [SerializeField] int minBuildIndex;
 
-    readonly List<string> scenePaths = new();
+    readonly List<string> scenePaths = new List<string>();
 
     void Start()
     {
@@ -106,7 +106,5 @@ public class DropDownHandler : MonoBehaviour
     {
         if (TextBox == null || dropdown.options.Count == 0)
             return;
-
-        DemoInput.SetStatus(TextBox, dropdown.options[dropdown.value].text);
     }
 }

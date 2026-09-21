@@ -4,34 +4,27 @@ using System.Collections.Generic;
 namespace Pathfinding
 {
     /// <summary>
-    /// Always returns the item with the smallest priority value first.
+    /// Always returns the item with the smallest priority first.
     /// Used as the "open set" in Dijkstra and A*.
+    ///
+    /// This scans the list for the cheapest item: easy to read, fast enough
+    /// for the small teaching grid. Games with large maps use a binary heap.
     /// </summary>
     public sealed class PriorityQueue<TItem>
     {
         struct Entry
         {
-            public float Priority;
-            public long Order;
             public TItem Item;
+            public float Priority;
         }
 
-        readonly List<Entry> _items = new();
-        long _order;
+        readonly List<Entry> _items = new List<Entry>();
 
         public bool IsEmpty => _items.Count == 0;
 
         public void Enqueue(TItem item, float priority)
         {
-            var entry = new Entry
-            {
-                Priority = priority,
-                Order = _order++,
-                Item = item
-            };
-
-            _items.Add(entry);
-            BubbleUp(_items.Count - 1);
+            _items.Add(new Entry { Item = item, Priority = priority });
         }
 
         public TItem Dequeue()
@@ -39,68 +32,16 @@ namespace Pathfinding
             if (_items.Count == 0)
                 throw new InvalidOperationException("Priority queue is empty.");
 
-            Entry best = _items[0];
-            Entry last = _items[_items.Count - 1];
-            _items.RemoveAt(_items.Count - 1);
-
-            if (_items.Count > 0)
+            int best = 0;
+            for (int i = 1; i < _items.Count; i++)
             {
-                _items[0] = last;
-                BubbleDown(0);
+                if (_items[i].Priority < _items[best].Priority)
+                    best = i;
             }
 
-            return best.Item;
-        }
-
-        void BubbleUp(int index)
-        {
-            Entry moving = _items[index];
-
-            while (index > 0)
-            {
-                int parent = (index - 1) / 2;
-                if (!IsHigherPriority(moving, _items[parent]))
-                    break;
-
-                _items[index] = _items[parent];
-                index = parent;
-            }
-
-            _items[index] = moving;
-        }
-
-        void BubbleDown(int index)
-        {
-            Entry moving = _items[index];
-
-            while (true)
-            {
-                int left = index * 2 + 1;
-                int right = left + 1;
-
-                if (left >= _items.Count)
-                    break;
-
-                int bestChild = left;
-                if (right < _items.Count && IsHigherPriority(_items[right], _items[left]))
-                    bestChild = right;
-
-                if (!IsHigherPriority(_items[bestChild], moving))
-                    break;
-
-                _items[index] = _items[bestChild];
-                index = bestChild;
-            }
-
-            _items[index] = moving;
-        }
-
-        static bool IsHigherPriority(Entry a, Entry b)
-        {
-            if (a.Priority != b.Priority)
-                return a.Priority < b.Priority;
-
-            return a.Order < b.Order;
+            TItem item = _items[best].Item;
+            _items.RemoveAt(best);
+            return item;
         }
     }
 }

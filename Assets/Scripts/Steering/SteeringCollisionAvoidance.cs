@@ -1,44 +1,31 @@
-// ReSharper disable CheckNamespace
 using UnityEngine;
-using UnityEngine.Serialization;
 
 /// <summary>
-/// Tuts+ collision avoidance using circle casts along the movement line.
+/// Look-ahead obstacle avoidance (Tuts+ / Reynolds).
+///
+/// 1. Cast a circle along the movement line.
+/// 2. If a wall is found, steer away from it (or slide along it).
+/// 3. If already overlapping a wall, cancel velocity that would push deeper.
+///
 /// https://code.tutsplus.com/understanding-steering-behaviors-collision-avoidance--gamedev-7777t
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(CircleCollider2D))]
 public class SteeringCollisionAvoidance : MonoBehaviour
 {
-    const float MinLookAheadScale = 0.5f;
+    // Cosine of ~45°. If the desired heading is more into the wall than this,
+    // slide along the wall instead of bouncing off it.
+    const float SlideWhenFacingWall = 0.7f;
 
-    static readonly Collider2D[] OverlapBuffer = new Collider2D[8];
-
-    [FormerlySerializedAs("obstacleLayers")]
-    [FormerlySerializedAs("_obstacleLayers")]
     [SerializeField] LayerMask obstacleLayers = 1 << 3;
-
-    [FormerlySerializedAs("seeAhead")]
-    [FormerlySerializedAs("_seeAhead")]
     [SerializeField] float maxSeeAhead = 3f;
-
-    [FormerlySerializedAs("maxAvoidForce")]
-    [FormerlySerializedAs("_maxAvoidForce")]
     [SerializeField] float maxAvoidForce = 12f;
-
-    [Tooltip("Extra radius on casts so agents keep a small gap from edges.")]
-    [FormerlySerializedAs("_wallClearance")]
+    [Tooltip("Extra radius so agents keep a small gap from walls.")]
     [SerializeField] float obstaclePadding = 0.4f;
 
     CircleCollider2D body;
-    ContactFilter2D obstacleFilter;
 
-    void Awake()
-    {
-        body = GetComponent<CircleCollider2D>();
-        obstacleFilter = new ContactFilter2D { useLayerMask = true, useTriggers = false };
-        obstacleFilter.SetLayerMask(obstacleLayers);
-    }
+    void Awake() => body = GetComponent<CircleCollider2D>();
 
     public Vector2 GetAvoidanceForce(
         Vector2 position,
@@ -46,15 +33,23 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         Vector2 desiredVelocity,
         float maxSpeed)
     {
-        if (!TryGetLookRay(velocity, desiredVelocity, maxSpeed, out Vector2 direction, out float lookLength))
+        Vector2 lookDirection = velocity.sqrMagnitude > SteeringMath.Epsilon
+            ? velocity
+            : desiredVelocity;
+
+        if (lookDirection.sqrMagnitude < SteeringMath.Epsilon)
             return Vector2.zero;
 
-        float castRadius = Radius() + obstaclePadding;
-        if (!TryFindClosestHit(position, direction, lookLength, castRadius, out SurfaceHit hit))
+        lookDirection.Normalize();
+
+        float lookLength = LookAheadLength(velocity, desiredVelocity, maxSpeed);
+        float radius = Radius() + obstaclePadding;
+
+        if (!TryFindWall(position, lookDirection, lookLength, radius, out Vector2 wallPoint, out Vector2 wallNormal))
             return Vector2.zero;
 
-        Vector2 ahead = position + direction * lookLength;
-        return BuildForce(position, ahead, hit, desiredVelocity);
+        Vector2 ahead = position + lookDirection * lookLength;
+        return AvoidForce(ahead, wallPoint, wallNormal, desiredVelocity);
     }
 
     public Vector2 PreventMovingIntoWalls(Vector2 position, Vector2 velocity)
@@ -62,20 +57,20 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         if (velocity.sqrMagnitude < SteeringMath.Epsilon)
             return velocity;
 
-        int count = Physics2D.OverlapCircle(position, Radius(), obstacleFilter, OverlapBuffer);
+        Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, Radius(), obstacleLayers);
         Vector2 result = velocity;
 
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < overlaps.Length; i++)
         {
-            Collider2D wall = OverlapBuffer[i];
+            Collider2D wall = overlaps[i];
             if (wall == null || wall == body)
                 continue;
 
-            Vector2 toAgent = position - wall.ClosestPoint(position);
-            if (toAgent.sqrMagnitude < SteeringMath.Epsilon)
+            Vector2 away = position - wall.ClosestPoint(position);
+            if (away.sqrMagnitude < SteeringMath.Epsilon)
                 continue;
 
-            Vector2 normal = toAgent.normalized;
+            Vector2 normal = away.normalized;
             float intoWall = Vector2.Dot(result, -normal);
             if (intoWall > 0f)
                 result += normal * intoWall;
@@ -84,125 +79,78 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         return result;
     }
 
-    bool TryGetLookRay(
-        Vector2 velocity,
-        Vector2 desiredVelocity,
-        float maxSpeed,
-        out Vector2 direction,
-        out float lookLength)
+    float LookAheadLength(Vector2 velocity, Vector2 desiredVelocity, float maxSpeed)
     {
-        bool wantsToMove = desiredVelocity.sqrMagnitude > SteeringMath.Epsilon;
-        direction = velocity.sqrMagnitude > SteeringMath.Epsilon ? velocity : desiredVelocity;
-        if (direction.sqrMagnitude < SteeringMath.Epsilon)
-        {
-            lookLength = 0f;
-            return false;
-        }
-
-        direction.Normalize();
-
         float speedScale = maxSpeed > SteeringMath.Epsilon
             ? Mathf.Clamp01(velocity.magnitude / maxSpeed)
             : 0f;
-        lookLength = maxSeeAhead * speedScale;
 
-        if (wantsToMove && lookLength < maxSeeAhead * MinLookAheadScale)
-            lookLength = maxSeeAhead * MinLookAheadScale;
+        float lookLength = maxSeeAhead * speedScale;
 
-        return true;
+        // Keep a minimum look-ahead while the agent intends to move,
+        // otherwise it only sees walls after it is already going fast.
+        bool wantsToMove = desiredVelocity.sqrMagnitude > SteeringMath.Epsilon;
+        if (wantsToMove)
+            lookLength = Mathf.Max(lookLength, maxSeeAhead * 0.5f);
+
+        return lookLength;
     }
 
-    struct SurfaceHit
-    {
-        public Vector2 Point;
-        public Vector2 Normal;
-    }
-
-    bool TryFindClosestHit(
+    bool TryFindWall(
         Vector2 position,
         Vector2 direction,
         float lookLength,
-        float castRadius,
-        out SurfaceHit closest)
+        float radius,
+        out Vector2 point,
+        out Vector2 normal)
     {
-        closest = default;
-        float closestDistance = float.MaxValue;
+        point = default;
+        normal = default;
 
-        ConsiderCast(
-            Physics2D.CircleCast(position, castRadius, direction, lookLength, obstacleLayers),
-            ref closest,
-            ref closestDistance);
-        ConsiderCast(
-            Physics2D.CircleCast(position, castRadius, direction, lookLength * 0.5f, obstacleLayers),
-            ref closest,
-            ref closestDistance);
-
-        int count = Physics2D.OverlapCircle(position, castRadius, obstacleFilter, OverlapBuffer);
-        for (int i = 0; i < count; i++)
+        // CircleCast can miss a wall we are already overlapping, so check that first.
+        Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, radius, obstacleLayers);
+        for (int i = 0; i < overlaps.Length; i++)
         {
-            Collider2D wall = OverlapBuffer[i];
+            Collider2D wall = overlaps[i];
             if (wall == null || wall == body)
                 continue;
 
-            ConsiderTouch(position, wall, ref closest, ref closestDistance);
+            point = wall.ClosestPoint(position);
+            Vector2 away = position - point;
+            normal = away.sqrMagnitude > SteeringMath.Epsilon ? away.normalized : Vector2.up;
+            return true;
         }
 
-        return closestDistance < float.MaxValue;
+        RaycastHit2D hit = Physics2D.CircleCast(position, radius, direction, lookLength, obstacleLayers);
+        if (hit.collider == null || hit.collider == body)
+            return false;
+
+        point = hit.point;
+        normal = hit.normal;
+        return true;
     }
 
-    void ConsiderCast(RaycastHit2D hit, ref SurfaceHit closest, ref float closestDistance)
+    Vector2 AvoidForce(Vector2 ahead, Vector2 wallPoint, Vector2 wallNormal, Vector2 desiredVelocity)
     {
-        if (hit.collider == null || hit.collider == body || hit.distance >= closestDistance)
-            return;
+        Vector2 away = ahead - wallPoint;
+        if (away.sqrMagnitude < SteeringMath.Epsilon)
+            away = wallNormal;
 
-        closestDistance = hit.distance;
-        closest = new SurfaceHit { Point = hit.point, Normal = hit.normal };
-    }
-
-    static void ConsiderTouch(
-        Vector2 agentPosition,
-        Collider2D wall,
-        ref SurfaceHit closest,
-        ref float closestDistance)
-    {
-        if (closestDistance <= 0f)
-            return;
-
-        Vector2 onSurface = wall.ClosestPoint(agentPosition);
-        Vector2 toAgent = agentPosition - onSurface;
-        Vector2 normal = toAgent.sqrMagnitude > SteeringMath.Epsilon
-            ? toAgent.normalized
-            : Vector2.up;
-
-        closestDistance = 0f;
-        closest = new SurfaceHit { Point = onSurface, Normal = normal };
-    }
-
-    Vector2 BuildForce(
-        Vector2 position,
-        Vector2 ahead,
-        SurfaceHit hit,
-        Vector2 desiredVelocity)
-    {
-        Vector2 awayFromWall = ahead - hit.Point;
-        if (awayFromWall.sqrMagnitude < SteeringMath.Epsilon)
-            awayFromWall = hit.Normal.sqrMagnitude > SteeringMath.Epsilon ? hit.Normal : position - hit.Point;
-
-        if (awayFromWall.sqrMagnitude < SteeringMath.Epsilon)
+        if (away.sqrMagnitude < SteeringMath.Epsilon)
             return Vector2.zero;
 
-        Vector2 wallOut = awayFromWall.normalized;
+        Vector2 awayFromWall = away.normalized;
 
         if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
-            return wallOut * maxAvoidForce;
+            return awayFromWall * maxAvoidForce;
 
-        Vector2 intoWall = -wallOut;
-        if (Vector2.Dot(desiredVelocity.normalized, intoWall) < 0.7f)
-            return wallOut * maxAvoidForce;
+        Vector2 intoWall = -awayFromWall;
+        if (Vector2.Dot(desiredVelocity.normalized, intoWall) < SlideWhenFacingWall)
+            return awayFromWall * maxAvoidForce;
 
         Vector2 alongWall = desiredVelocity - intoWall * Vector2.Dot(desiredVelocity, intoWall);
         if (alongWall.sqrMagnitude < SteeringMath.Epsilon)
-            alongWall = new Vector2(-wallOut.y, wallOut.x);
+            alongWall = new Vector2(-awayFromWall.y, awayFromWall.x);
 
         return alongWall.normalized * maxAvoidForce;
     }

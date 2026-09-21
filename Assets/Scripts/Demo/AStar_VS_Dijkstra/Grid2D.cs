@@ -4,7 +4,8 @@ using UnityEngine;
 namespace Pathfinding
 {
     /// <summary>
-    /// Walkability grid for pathfinding demos. (0,0) is bottom-left; moves are 8-way with costs 1 / 2.
+    /// Walkability grid. (0,0) is bottom-left.
+    /// Movement is 8-way: cardinal cost 1, diagonal cost 2.
     /// </summary>
     public class Grid2D
     {
@@ -39,34 +40,35 @@ namespace Pathfinding
         {
             var neighbours = new List<Vector2Int>(8);
 
-            TryAddNeighbour(neighbours, cell.x + 1, cell.y);
-            TryAddNeighbour(neighbours, cell.x - 1, cell.y);
-            TryAddNeighbour(neighbours, cell.x, cell.y + 1);
-            TryAddNeighbour(neighbours, cell.x, cell.y - 1);
+            TryAdd(neighbours, cell.x + 1, cell.y);
+            TryAdd(neighbours, cell.x - 1, cell.y);
+            TryAdd(neighbours, cell.x, cell.y + 1);
+            TryAdd(neighbours, cell.x, cell.y - 1);
 
-            TryAddDiagonalNeighbour(neighbours, cell, cell.x + 1, cell.y + 1);
-            TryAddDiagonalNeighbour(neighbours, cell, cell.x + 1, cell.y - 1);
-            TryAddDiagonalNeighbour(neighbours, cell, cell.x - 1, cell.y + 1);
-            TryAddDiagonalNeighbour(neighbours, cell, cell.x - 1, cell.y - 1);
+            TryAddDiagonal(neighbours, cell, cell.x + 1, cell.y + 1);
+            TryAddDiagonal(neighbours, cell, cell.x + 1, cell.y - 1);
+            TryAddDiagonal(neighbours, cell, cell.x - 1, cell.y + 1);
+            TryAddDiagonal(neighbours, cell, cell.x - 1, cell.y - 1);
 
             return neighbours;
         }
 
-        void TryAddNeighbour(List<Vector2Int> neighbours, int x, int y)
+        void TryAdd(List<Vector2Int> neighbours, int x, int y)
         {
             if (IsWalkable(x, y))
                 neighbours.Add(new Vector2Int(x, y));
         }
 
-        void TryAddDiagonalNeighbour(List<Vector2Int> neighbours, Vector2Int from, int x, int y)
+        void TryAddDiagonal(List<Vector2Int> neighbours, Vector2Int from, int x, int y)
         {
             if (!IsWalkable(x, y))
                 return;
 
-            bool cardinalX = IsWalkable(from.x, y);
-            bool cardinalY = IsWalkable(x, from.y);
-
-            if (cardinalX != cardinalY)
+            // Both adjacent cardinal tiles must be free, otherwise the
+            // diagonal would cut through a wall corner.
+            bool sideOpen = IsWalkable(from.x, y);
+            bool otherSideOpen = IsWalkable(x, from.y);
+            if (!sideOpen || !otherSideOpen)
                 return;
 
             neighbours.Add(new Vector2Int(x, y));

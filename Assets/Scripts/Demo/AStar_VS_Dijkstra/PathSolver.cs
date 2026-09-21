@@ -26,9 +26,8 @@ namespace Pathfinding
     }
 
     /// <summary>
-    /// Teaching-friendly pathfinding.
+    /// Dijkstra and A* share the same loop.
     /// Dijkstra priority = g(n). A* priority = g(n) + h(n).
-    /// Everything else is shared.
     /// </summary>
     public static class PathSolver
     {
@@ -51,7 +50,7 @@ namespace Pathfinding
             costSoFar[start.x, start.y] = 0;
 
             Vector2Int[,] cameFrom = new Vector2Int[grid.Width, grid.Height];
-            MarkUnset(cameFrom);
+            bool[,] hasParent = new bool[grid.Width, grid.Height];
 
             var visited = new HashSet<Vector2Int>();
             var openSet = new PriorityQueue<Vector2Int>();
@@ -70,7 +69,7 @@ namespace Pathfinding
                 expansionOrder.Add(current);
 
                 if (current == goal)
-                    return BuildSuccess(goal, costSoFar, cameFrom, expansionOrder);
+                    return BuildSuccess(goal, costSoFar, cameFrom, hasParent, expansionOrder);
 
                 foreach (Vector2Int neighbour in grid.GetWalkableNeighbours(current))
                 {
@@ -78,12 +77,12 @@ namespace Pathfinding
                         continue;
 
                     int newCost = costSoFar[current.x, current.y] + GetStepCost(current, neighbour);
-
                     if (newCost >= costSoFar[neighbour.x, neighbour.y])
                         continue;
 
                     costSoFar[neighbour.x, neighbour.y] = newCost;
                     cameFrom[neighbour.x, neighbour.y] = current;
+                    hasParent[neighbour.x, neighbour.y] = true;
                     openSet.Enqueue(neighbour, Priority(neighbour, goal, costSoFar, useHeuristic));
                 }
             }
@@ -104,19 +103,21 @@ namespace Pathfinding
             return dx != 0 && dy != 0 ? DiagonalStepCost : CardinalStepCost;
         }
 
+        // Admissible heuristic for 8-way movement with costs 1 and 2.
         static int OctileDistance(Vector2Int a, Vector2Int b)
         {
             int dx = Mathf.Abs(a.x - b.x);
             int dy = Mathf.Abs(a.y - b.y);
-            int min = Mathf.Min(dx, dy);
-            int max = Mathf.Max(dx, dy);
-            return min * DiagonalStepCost + (max - min) * CardinalStepCost;
+            int diagonalSteps = Mathf.Min(dx, dy);
+            int cardinalSteps = Mathf.Max(dx, dy) - diagonalSteps;
+            return diagonalSteps * DiagonalStepCost + cardinalSteps * CardinalStepCost;
         }
 
         static SearchResult BuildSuccess(
             Vector2Int goal,
             int[,] costSoFar,
             Vector2Int[,] cameFrom,
+            bool[,] hasParent,
             List<Vector2Int> expansionOrder)
         {
             return new SearchResult
@@ -124,7 +125,7 @@ namespace Pathfinding
                 Found = true,
                 Cost = costSoFar[goal.x, goal.y],
                 NodesExpanded = expansionOrder.Count,
-                Path = ReconstructPath(goal, cameFrom),
+                Path = ReconstructPath(goal, cameFrom, hasParent),
                 ExpansionOrder = expansionOrder
             };
         }
@@ -137,7 +138,7 @@ namespace Pathfinding
             return failed;
         }
 
-        static List<Vector2Int> ReconstructPath(Vector2Int goal, Vector2Int[,] cameFrom)
+        static List<Vector2Int> ReconstructPath(Vector2Int goal, Vector2Int[,] cameFrom, bool[,] hasParent)
         {
             var path = new List<Vector2Int>();
             Vector2Int current = goal;
@@ -146,11 +147,10 @@ namespace Pathfinding
             {
                 path.Add(current);
 
-                Vector2Int previous = cameFrom[current.x, current.y];
-                if (!IsSet(previous))
+                if (!hasParent[current.x, current.y])
                     break;
 
-                current = previous;
+                current = cameFrom[current.x, current.y];
             }
 
             path.Reverse();
@@ -169,16 +169,5 @@ namespace Pathfinding
 
             return costs;
         }
-
-        static void MarkUnset(Vector2Int[,] table)
-        {
-            for (int y = 0; y < table.GetLength(1); y++)
-            {
-                for (int x = 0; x < table.GetLength(0); x++)
-                    table[x, y] = new Vector2Int(-1, -1);
-            }
-        }
-
-        static bool IsSet(Vector2Int value) => value.x >= 0 && value.y >= 0;
     }
 }

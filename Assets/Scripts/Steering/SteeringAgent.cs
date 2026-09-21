@@ -1,9 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// Simple agent used by the Seek vs Flee demo.
-/// Uses the same SteeringMath formula as the enemy scripts,
-/// but moves a Transform directly instead of a Rigidbody2D.
+/// Simplest steering agent: no Rigidbody, no range checks.
+/// Used by SeekAndFleeDemo. In-scene enemies use SteeringEnemy instead.
 /// </summary>
 public class SteeringAgent : MonoBehaviour
 {
