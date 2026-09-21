@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Look-ahead obstacle avoidance (Tuts+ / Reynolds).
+/// Look-ahead obstacle avoidance.
 ///
 /// 1. Cast a circle along the movement line.
 /// 2. If a wall is found, steer away from it (or slide along it).
