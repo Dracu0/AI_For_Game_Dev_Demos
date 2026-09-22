@@ -4,8 +4,8 @@ using UnityEngine;
 /// Look-ahead obstacle avoidance.
 ///
 /// Cast a circle along the movement line. If a wall is in the way, steer away
-/// from it — or slide along it when heading into it. If the agent is already
-/// overlapping a wall, cancel the velocity that would push deeper.
+/// from it — or slide along it when heading into it. If the agent is inside the
+/// padded gap, cancel the velocity that would push deeper.
 ///
 /// https://code.tutsplus.com/understanding-steering-behaviors-collision-avoidance--gamedev-7777t
 /// </summary>
@@ -56,7 +56,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         if (velocity.sqrMagnitude < SteeringMath.Epsilon)
             return velocity;
 
-        Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, BodyRadius(), obstacleLayers);
+        Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, KeepOutRadius(), obstacleLayers);
 
         for (int i = 0; i < overlaps.Length; i++)
         {
@@ -94,7 +94,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
 
     bool TryFindWall(Vector2 position, Vector2 direction, float lookDistance, out Vector2 awayFromWall)
     {
-        float radius = BodyRadius() + obstaclePadding;
+        float radius = KeepOutRadius();
 
         // CircleCast starts outside the body, so it misses a wall we are already touching.
         Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, radius, obstacleLayers);
@@ -129,7 +129,9 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
             return awayFromWall * maxAvoidForce;
 
-        // Aimed into the wall: keep the part of the desired velocity that runs along it.
+        Vector2 pushOut = awayFromWall * maxAvoidForce;
+
+        // Aimed into the wall: slide along it, and keep the outward push so the gap holds.
         Vector2 intoWall = -awayFromWall;
         if (Vector2.Dot(desiredVelocity.normalized, intoWall) >= SlideWhenFacingWall)
         {
@@ -137,10 +139,10 @@ public class SteeringCollisionAvoidance : MonoBehaviour
             if (alongWall.sqrMagnitude < SteeringMath.Epsilon)
                 alongWall = Vector2.Perpendicular(awayFromWall);
 
-            return alongWall.normalized * maxAvoidForce;
+            return alongWall.normalized * maxAvoidForce + pushOut;
         }
 
-        return awayFromWall * maxAvoidForce;
+        return pushOut;
     }
 
     float BodyRadius()
@@ -153,6 +155,8 @@ public class SteeringCollisionAvoidance : MonoBehaviour
 
         return body.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.y);
     }
+
+    float KeepOutRadius() => BodyRadius() + Mathf.Max(0f, obstaclePadding);
 
     // Scene view: yellow = look-ahead, green = wall normal, magenta = steer force, red = overlap push-out.
     [SerializeField] bool showGizmos = true;
@@ -197,7 +201,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         if (!showGizmos)
             return;
 
-        float radius = BodyRadius() + obstaclePadding;
+        float radius = KeepOutRadius();
         Vector2 origin = gizmoHasSample ? gizmoPosition : (Vector2)transform.position;
 
         Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.85f);
@@ -230,7 +234,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
 
     void DrawOverlapNormals(Vector2 origin)
     {
-        Collider2D[] overlaps = Physics2D.OverlapCircleAll(origin, BodyRadius(), obstacleLayers);
+        Collider2D[] overlaps = Physics2D.OverlapCircleAll(origin, KeepOutRadius(), obstacleLayers);
         Gizmos.color = new Color(1f, 0.3f, 0.3f);
 
         for (int i = 0; i < overlaps.Length; i++)
