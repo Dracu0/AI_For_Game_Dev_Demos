@@ -3,36 +3,27 @@ using UnityEngine;
 /// <summary>
 /// Patrol until the player enters detection, then steering.
 /// When the player leaves, walk to the last seen point, wait, then patrol again.
-/// Detection radius is the only chase range. SteeringEnemy.range is not used while this runs.
 /// </summary>
 [RequireComponent(typeof(WaypointPatrol), typeof(SteeringEnemy))]
 [DefaultExecutionOrder(-10)]
 public class WaypointPatrolChase : MonoBehaviour
 {
-    enum Phase
-    {
-        Patrolling,
-        Chasing,
-        InvestigateMove,
-        InvestigateWait
-    }
+    enum Phase { Patrol, Chase, GoToLastSeen, Wait }
 
     [SerializeField] float detectionRadius = 5f;
-
-    public float DetectionRadius => detectionRadius;
     [SerializeField] float returnToPatrolDelay = 2f;
     [SerializeField] float investigateSpeed = 3f;
-    [SerializeField] float investigateArriveDistance = 0.15f;
+    [SerializeField] float arriveDistance = 0.15f;
+
+    public float DetectionRadius => detectionRadius;
 
     WaypointPatrol _patrol;
     SteeringEnemy _steering;
     Rigidbody2D _rb;
 
-    Phase _phase = Phase.Patrolling;
-    Vector2 _lastSeenPosition;
-    float _waitAtLastSeen;
-    float _stuckTime;
-    float _closestDistance;
+    Phase _phase = Phase.Patrol;
+    Vector2 _lastSeen;
+    float _wait;
 
     void Awake()
     {
@@ -41,45 +32,11 @@ public class WaypointPatrolChase : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
     }
 
-    void OnValidate()
-    {
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.delayCall += DelayedSyncRangeVisual;
-#else
-        SyncRangeVisual();
-#endif
-    }
-
-#if UNITY_EDITOR
-    void DelayedSyncRangeVisual()
-    {
-        if (this == null)
-            return;
-
-        SyncRangeVisual();
-    }
-#endif
-
-    void SyncRangeVisual()
-    {
-        if (_steering == null)
-            _steering = GetComponent<SteeringEnemy>();
-
-        if (_steering != null)
-            _steering.RefreshRangeVisuals();
-    }
-
-#if UNITY_EDITOR
-    void Reset() => SyncRangeVisual();
-#endif
-
     void Start()
     {
-        SetDrivenBySteering(false);
+        UseSteering(false);
         _steering.SetSteeringActive(false);
-        _patrol.SetPatrolActive(true);
-        _phase = Phase.Patrolling;
-        _steering.RefreshRangeVisuals();
+        _patrol.SetActive(true);
     }
 
     void FixedUpdate()
@@ -88,106 +45,77 @@ public class WaypointPatrolChase : MonoBehaviour
         if (player == null)
             return;
 
-        Vector2 enemyPos = _rb != null ? _rb.position : (Vector2)transform.position;
-        bool playerDetected = Vector2.Distance(enemyPos, player.position) <= detectionRadius;
-
-        if (playerDetected)
+        Vector2 pos = _rb != null ? _rb.position : (Vector2)transform.position;
+        if (Vector2.Distance(pos, player.position) <= detectionRadius)
         {
-            _lastSeenPosition = player.position;
-            EnterChase();
+            _lastSeen = player.position;
+            StartChase();
             return;
         }
 
-        switch (_phase)
-        {
-            case Phase.Chasing:
-                EnterInvestigate();
-                break;
-            case Phase.InvestigateMove:
-                UpdateInvestigateMove();
-                break;
-            case Phase.InvestigateWait:
-                UpdateInvestigateWait();
-                break;
-        }
+        if (_phase == Phase.Chase)
+            StartGoToLastSeen();
+        else if (_phase == Phase.GoToLastSeen)
+            GoToLastSeen();
+        else if (_phase == Phase.Wait)
+            WaitThenPatrol();
     }
 
-    void EnterChase()
+    void StartChase()
     {
-        if (_phase == Phase.Chasing)
+        if (_phase == Phase.Chase)
             return;
 
-        _phase = Phase.Chasing;
-        _patrol.SetPatrolActive(false);
-        SetDrivenBySteering(true);
+        _phase = Phase.Chase;
+        _patrol.SetActive(false);
+        UseSteering(true);
         _steering.SetSteeringActive(true, bypassRangeLimit: true);
     }
 
-    void EnterInvestigate()
+    void StartGoToLastSeen()
     {
-        _phase = Phase.InvestigateMove;
-        _waitAtLastSeen = 0f;
-        _stuckTime = 0f;
-        _closestDistance = float.MaxValue;
+        _phase = Phase.GoToLastSeen;
+        _wait = 0f;
         _steering.SetSteeringActive(false);
-        _patrol.SetPatrolActive(false);
-        SetDrivenBySteering(false);
+        _patrol.SetActive(false);
+        UseSteering(false);
 
         if (_rb != null)
             transform.position = _rb.position;
     }
 
-    void UpdateInvestigateMove()
+    void GoToLastSeen()
     {
-        Vector2 pos = _rb != null ? _rb.position : (Vector2)transform.position;
-        float distance = Vector2.Distance(pos, _lastSeenPosition);
-
-        if (distance <= investigateArriveDistance || IsStuck(distance))
-        {
-            if (_rb != null)
-                _rb.linearVelocity = Vector2.zero;
-
-            _phase = Phase.InvestigateWait;
-            _waitAtLastSeen = 0f;
+        if (!AgentMove2D.StepTowards(transform, _rb, _lastSeen, investigateSpeed, arriveDistance))
             return;
-        }
 
-        AgentMove2D.MoveTowards(transform, _rb, _lastSeenPosition, investigateSpeed);
+        if (_rb != null)
+            _rb.linearVelocity = Vector2.zero;
+
+        _phase = Phase.Wait;
+        _wait = 0f;
     }
 
-    void UpdateInvestigateWait()
+    void WaitThenPatrol()
     {
         if (_rb != null)
             _rb.linearVelocity = Vector2.zero;
 
-        _waitAtLastSeen += Time.fixedDeltaTime;
-        if (_waitAtLastSeen < returnToPatrolDelay)
+        _wait += Time.fixedDeltaTime;
+        if (_wait < returnToPatrolDelay)
             return;
 
-        _phase = Phase.Patrolling;
-        SetDrivenBySteering(false);
-        _patrol.SetPatrolActive(true);
+        _phase = Phase.Patrol;
+        UseSteering(false);
+        _patrol.SetActive(true);
     }
 
-    bool IsStuck(float distance)
-    {
-        if (distance < _closestDistance - 0.02f)
-        {
-            _closestDistance = distance;
-            _stuckTime = 0f;
-            return false;
-        }
-
-        _stuckTime += Time.fixedDeltaTime;
-        return _stuckTime > 0.75f;
-    }
-
-    void SetDrivenBySteering(bool steering)
+    void UseSteering(bool on)
     {
         if (_rb == null)
             return;
 
-        _rb.bodyType = steering ? RigidbodyType2D.Dynamic : RigidbodyType2D.Kinematic;
+        _rb.bodyType = on ? RigidbodyType2D.Dynamic : RigidbodyType2D.Kinematic;
         _rb.linearVelocity = Vector2.zero;
     }
 
@@ -200,16 +128,11 @@ public class WaypointPatrolChase : MonoBehaviour
 
     void OnDrawGizmos()
     {
-        if (!Application.isPlaying)
-            SyncRangeVisual();
-
-        if (!showLastSeenGizmo || _phase != Phase.InvestigateMove && _phase != Phase.InvestigateWait)
+        if (!showLastSeenGizmo || _phase != Phase.GoToLastSeen && _phase != Phase.Wait)
             return;
 
-        Vector3 origin = transform.position;
-
         Gizmos.color = lastSeenGizmoColor;
-        Gizmos.DrawWireSphere(_lastSeenPosition, investigateArriveDistance);
-        Gizmos.DrawLine(origin, _lastSeenPosition);
+        Gizmos.DrawWireSphere(_lastSeen, arriveDistance);
+        Gizmos.DrawLine(transform.position, _lastSeen);
     }
 }

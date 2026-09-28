@@ -5,12 +5,13 @@ using UnityEngine;
 /// </summary>
 public static class AgentMove2D
 {
-    public static void MoveTowards(Transform transform, Rigidbody2D rb, Vector2 goal, float speed)
+    public static bool StepTowards(Transform transform, Rigidbody2D rb, Vector2 goal, float speed, float arriveDistance)
     {
-        float step = speed * Time.fixedDeltaTime;
         Vector2 pos = rb != null ? rb.position : (Vector2)transform.position;
-        Vector2 next = Vector2.MoveTowards(pos, goal, step);
+        if (Vector2.Distance(pos, goal) <= arriveDistance)
+            return true;
 
+        Vector2 next = Vector2.MoveTowards(pos, goal, speed * Time.fixedDeltaTime);
         if (rb != null)
         {
             rb.linearVelocity = Vector2.zero;
@@ -18,5 +19,7 @@ public static class AgentMove2D
         }
         else
             transform.position = next;
+
+        return false;
     }
 }

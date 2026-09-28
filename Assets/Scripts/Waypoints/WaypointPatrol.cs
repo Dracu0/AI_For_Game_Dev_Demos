@@ -10,23 +10,15 @@ public class WaypointPatrol : MonoBehaviour
 
     Rigidbody2D _rb;
     int _index;
-    bool _patrolActive = true;
-    float _stuckTime;
-    float _closestDistance;
+    bool _active = true;
 
-    public bool IsPatrolActive => _patrolActive;
+    public bool IsActive => _active;
 
     void Awake() => _rb = GetComponent<Rigidbody2D>();
 
-    public void SetPatrolActive(bool active)
+    public void SetActive(bool active)
     {
-        if (_patrolActive == active)
-            return;
-
-        _patrolActive = active;
-        _stuckTime = 0f;
-        _closestDistance = float.MaxValue;
-
+        _active = active;
         if (!active || _rb == null)
             return;
 
@@ -36,47 +28,15 @@ public class WaypointPatrol : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (!_patrolActive || waypoints == null || waypoints.Length == 0)
+        if (!_active || waypoints == null || waypoints.Length == 0)
             return;
 
         Waypoint target = waypoints[_index];
         if (target == null)
-        {
-            Advance();
             return;
-        }
 
-        Vector2 goal = target.Position;
-        Vector2 pos = _rb != null ? _rb.position : (Vector2)transform.position;
-        float distance = Vector2.Distance(pos, goal);
-
-        if (distance <= arriveDistance || IsStuck(distance))
-        {
-            Advance();
-            return;
-        }
-
-        AgentMove2D.MoveTowards(transform, _rb, goal, speed);
-    }
-
-    bool IsStuck(float distance)
-    {
-        if (distance < _closestDistance - 0.02f)
-        {
-            _closestDistance = distance;
-            _stuckTime = 0f;
-            return false;
-        }
-
-        _stuckTime += Time.fixedDeltaTime;
-        return _stuckTime > 0.75f;
-    }
-
-    void Advance()
-    {
-        _index = (_index + 1) % waypoints.Length;
-        _stuckTime = 0f;
-        _closestDistance = float.MaxValue;
+        if (AgentMove2D.StepTowards(transform, _rb, target.Position, speed, arriveDistance))
+            _index = (_index + 1) % waypoints.Length;
     }
 
     // -------------------------------------------------------------------------
@@ -85,11 +45,10 @@ public class WaypointPatrol : MonoBehaviour
 
     void OnDrawGizmos()
     {
-        if (!_patrolActive || waypoints == null || waypoints.Length == 0)
+        if (!_active || waypoints == null || waypoints.Length == 0)
             return;
 
-        int index = Mathf.Clamp(_index, 0, waypoints.Length - 1);
-        Waypoint target = waypoints[index];
+        Waypoint target = waypoints[Mathf.Clamp(_index, 0, waypoints.Length - 1)];
         if (target == null)
             return;
 
