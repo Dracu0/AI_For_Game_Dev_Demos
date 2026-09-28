@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Straight-line move that stays in sync with a Rigidbody2D. Call from FixedUpdate.
+/// Moves in a straight line. Returns true once it is close enough. Call from FixedUpdate.
 /// </summary>
 public static class AgentMove2D
 {

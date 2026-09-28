@@ -1,14 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// Patrol until the player enters SteeringEnemy's detection radius, then steering.
-/// When the player leaves, walk to the last seen point, wait, then patrol again.
+/// Patrols until the player enters the detection radius, then steers.
+/// When the player leaves, walks to the last seen point, waits, then patrols again.
 /// </summary>
 [RequireComponent(typeof(WaypointPatrol), typeof(SteeringEnemy))]
 [DefaultExecutionOrder(-10)]
 public class WaypointPatrolChase : MonoBehaviour
 {
-    enum Phase { Patrol, Chase, GoToLastSeen, Wait }
+    enum Phase { Patrol, Chase, LastSeen, Wait }
 
     [SerializeField] float returnToPatrolDelay = 2f;
     [SerializeField] float investigateSpeed = 3f;
@@ -29,12 +29,7 @@ public class WaypointPatrolChase : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
     }
 
-    void Start()
-    {
-        UseSteering(false);
-        _steering.SetSteeringActive(false);
-        _patrol.SetActive(true);
-    }
+    void Start() => BeginPatrol();
 
     void FixedUpdate()
     {
@@ -46,48 +41,51 @@ public class WaypointPatrolChase : MonoBehaviour
         if (Vector2.Distance(pos, player.position) <= _steering.Range)
         {
             _lastSeen = player.position;
-            StartChase();
+            BeginChase();
             return;
         }
 
-        if (_phase == Phase.Chase)
-            StartGoToLastSeen();
-        else if (_phase == Phase.GoToLastSeen)
-            GoToLastSeen();
-        else if (_phase == Phase.Wait)
-            WaitThenPatrol();
+        switch (_phase)
+        {
+            case Phase.Chase:
+                BeginLastSeen();
+                break;
+            case Phase.LastSeen:
+                MoveToLastSeen();
+                break;
+            case Phase.Wait:
+                WaitThenPatrol();
+                break;
+        }
     }
 
-    void StartChase()
+    void BeginChase()
     {
         if (_phase == Phase.Chase)
             return;
 
         _phase = Phase.Chase;
         _patrol.SetActive(false);
-        UseSteering(true);
-        _steering.SetSteeringActive(true, bypassRangeLimit: true);
+        SetBody(steering: true);
+        _steering.SetSteeringActive(true);
     }
 
-    void StartGoToLastSeen()
+    void BeginLastSeen()
     {
-        _phase = Phase.GoToLastSeen;
+        _phase = Phase.LastSeen;
         _wait = 0f;
         _steering.SetSteeringActive(false);
         _patrol.SetActive(false);
-        UseSteering(false);
+        SetBody(steering: false);
 
         if (_rb != null)
             transform.position = _rb.position;
     }
 
-    void GoToLastSeen()
+    void MoveToLastSeen()
     {
         if (!AgentMove2D.StepTowards(transform, _rb, _lastSeen, investigateSpeed, arriveDistance))
             return;
-
-        if (_rb != null)
-            _rb.linearVelocity = Vector2.zero;
 
         _phase = Phase.Wait;
         _wait = 0f;
@@ -99,20 +97,24 @@ public class WaypointPatrolChase : MonoBehaviour
             _rb.linearVelocity = Vector2.zero;
 
         _wait += Time.fixedDeltaTime;
-        if (_wait < returnToPatrolDelay)
-            return;
+        if (_wait >= returnToPatrolDelay)
+            BeginPatrol();
+    }
 
+    void BeginPatrol()
+    {
         _phase = Phase.Patrol;
-        UseSteering(false);
+        SetBody(steering: false);
+        _steering.SetSteeringActive(false);
         _patrol.SetActive(true);
     }
 
-    void UseSteering(bool on)
+    void SetBody(bool steering)
     {
         if (_rb == null)
             return;
 
-        _rb.bodyType = on ? RigidbodyType2D.Dynamic : RigidbodyType2D.Kinematic;
+        _rb.bodyType = steering ? RigidbodyType2D.Dynamic : RigidbodyType2D.Kinematic;
         _rb.linearVelocity = Vector2.zero;
     }
 
@@ -120,16 +122,13 @@ public class WaypointPatrolChase : MonoBehaviour
     // Gizmos
     // -------------------------------------------------------------------------
 
-    [SerializeField] bool showLastSeenGizmo = true;
-    [SerializeField] Color lastSeenGizmoColor = new Color(1f, 0.6f, 0.2f, 0.85f);
-
     void OnDrawGizmos()
     {
-        if (!showLastSeenGizmo || _phase != Phase.GoToLastSeen && _phase != Phase.Wait)
+        if (_phase != Phase.LastSeen && _phase != Phase.Wait)
             return;
 
         Vector3 origin = Application.isPlaying && _rb != null ? (Vector3)_rb.position : transform.position;
-        Gizmos.color = lastSeenGizmoColor;
+        Gizmos.color = new Color(1f, 0.6f, 0.2f, 0.9f);
         Gizmos.DrawWireSphere(_lastSeen, arriveDistance);
         Gizmos.DrawLine(origin, _lastSeen);
     }

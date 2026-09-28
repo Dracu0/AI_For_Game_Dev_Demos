@@ -1,8 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// A single patrol node in 2D. Position is this transform.
-/// Link other waypoints in <see cref="connections"/> to define the patrol graph.
+/// One point on the map. Connections are only drawn; patrol order lives on WaypointPatrol.
 /// </summary>
 public class Waypoint : MonoBehaviour
 {
@@ -15,26 +14,21 @@ public class Waypoint : MonoBehaviour
     // Gizmos
     // -------------------------------------------------------------------------
 
-    [SerializeField] Color nodeColor = new Color(0.25f, 0.85f, 1f, 0.95f);
-    [SerializeField] Color lineColor = new Color(0.25f, 0.85f, 1f, 0.65f);
-
     void OnDrawGizmos()
     {
-        Vector3 pos = transform.position;
+        Gizmos.color = new Color(0.25f, 0.85f, 1f, 0.95f);
+        Gizmos.DrawWireSphere(transform.position, nodeRadius);
 
-        Gizmos.color = nodeColor;
-        Gizmos.DrawWireSphere(pos, nodeRadius);
-
-        if (connections == null || connections.Length == 0)
+        if (connections == null)
             return;
 
-        Gizmos.color = lineColor;
+        Gizmos.color = new Color(0.25f, 0.85f, 1f, 0.65f);
         foreach (Waypoint other in connections)
         {
             if (other == null || other == this)
                 continue;
 
-            Gizmos.DrawLine(pos, other.transform.position);
+            Gizmos.DrawLine(transform.position, other.Position);
         }
     }
 }

@@ -10,8 +10,8 @@ public enum SteeringMode
 }
 
 /// <summary>
-/// One steering enemy. Pick the behaviour in the Inspector.
-/// All modes share the same loop: compute a desired velocity, then steer.
+/// One steering enemy. Every mode does the same thing:
+/// pick a desired velocity, then steer toward it.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class SteeringEnemy : MonoBehaviour
@@ -41,129 +41,79 @@ public class SteeringEnemy : MonoBehaviour
     Rigidbody2D _rb;
     Rigidbody2D _playerRb;
     SteeringCollisionAvoidance _avoidance;
-    bool _steeringActive = true;
-    bool _bypassSteeringRange;
+    bool _active = true;
 
     public Transform Player => player;
-    public bool IsSteeringActive => _steeringActive;
     public float Range => range;
 
-    /// <param name="bypassRangeLimit">
-    /// When true, chase logic can pursue anywhere inside detection (not capped by <see cref="range"/>).
-    /// </param>
-    public void SetSteeringActive(bool active, bool bypassRangeLimit = false)
+    public void SetSteeringActive(bool active)
     {
-        if (_steeringActive == active && _bypassSteeringRange == bypassRangeLimit)
+        if (_active == active)
             return;
 
-        _steeringActive = active;
-        _bypassSteeringRange = active && bypassRangeLimit;
-        EnsureRigidbody();
+        _active = active;
+        if (_rb == null)
+            _rb = GetComponent<Rigidbody2D>();
         if (_rb == null)
             return;
 
         if (active)
             _rb.position = transform.position;
         else
-        {
-            _bypassSteeringRange = false;
             SteeringMath.Stop(_rb);
-        }
-    }
-
-    public void Bind(Transform target, SteeringMode steeringMode)
-    {
-        player = target;
-        mode = steeringMode;
-        CachePlayerRigidbody();
-        RefreshRangeVisuals();
-    }
-
-    void EnsureRigidbody()
-    {
-        if (_rb == null)
-            _rb = GetComponent<Rigidbody2D>();
     }
 
     void Awake()
     {
-        EnsureRigidbody();
+        _rb = GetComponent<Rigidbody2D>();
         _avoidance = GetComponent<SteeringCollisionAvoidance>();
         SteeringMath.SetupBody(_rb);
-        CachePlayerRigidbody();
-        RefreshRangeVisuals();
+        if (player != null)
+            _playerRb = player.GetComponent<Rigidbody2D>();
+        ResizeCircles();
     }
 
-    void OnValidate() => ScheduleRangeVisualRefresh();
-
-    void ScheduleRangeVisualRefresh()
+    void OnValidate()
     {
 #if UNITY_EDITOR
-        UnityEditor.EditorApplication.delayCall -= RefreshRangeVisualsIfAlive;
-        UnityEditor.EditorApplication.delayCall += RefreshRangeVisualsIfAlive;
-#else
-        RefreshRangeVisuals();
+        UnityEditor.EditorApplication.delayCall -= ResizeCircles;
+        UnityEditor.EditorApplication.delayCall += ResizeCircles;
 #endif
-    }
-
-    void RefreshRangeVisualsIfAlive()
-    {
-        if (this == null)
-            return;
-
-        RefreshRangeVisuals();
     }
 
     void FixedUpdate()
     {
-        if (!_steeringActive || player == null)
+        if (!_active || player == null)
             return;
 
-        if (!TryGetDesiredVelocity(out Vector2 desired))
+        if (Vector2.Distance(_rb.position, player.position) > range)
         {
             SteeringMath.Stop(_rb);
             return;
         }
 
-        _rb.linearVelocity = SteeringMath.Steer(_rb, desired, maxForce, maxSpeed, _avoidance);
+        _rb.linearVelocity = SteeringMath.Steer(_rb, DesiredVelocity(), maxForce, maxSpeed, _avoidance);
     }
 
-    bool TryGetDesiredVelocity(out Vector2 desired)
+    Vector2 DesiredVelocity()
     {
         Vector2 from = _rb.position;
         Vector2 to = player.position;
 
-        if (!_bypassSteeringRange && SteeringMath.IsOutOfRange(from, to, range))
-        {
-            desired = default;
-            return false;
-        }
-
         switch (mode)
         {
             case SteeringMode.Seek:
-                desired = SteeringMath.SeekVelocity(from, to, maxSpeed);
-                return true;
-
+                return SteeringMath.SeekVelocity(from, to, maxSpeed);
             case SteeringMode.Flee:
-                desired = SteeringMath.FleeVelocity(from, to, maxSpeed);
-                return true;
-
+                return SteeringMath.FleeVelocity(from, to, maxSpeed);
             case SteeringMode.Arrival:
-                desired = SteeringMath.ArrivalVelocity(from, to, maxSpeed, slowRadius);
-                return true;
-
+                return SteeringMath.ArrivalVelocity(from, to, maxSpeed, slowRadius);
             case SteeringMode.Pursue:
-                desired = SteeringMath.SeekVelocity(from, PredictedPlayerPosition(), maxSpeed);
-                return true;
-
+                return SteeringMath.SeekVelocity(from, PredictedPlayerPosition(), maxSpeed);
             case SteeringMode.Evade:
-                desired = SteeringMath.FleeVelocity(from, PredictedPlayerPosition(), maxSpeed);
-                return true;
-
+                return SteeringMath.FleeVelocity(from, PredictedPlayerPosition(), maxSpeed);
             default:
-                desired = default;
-                return false;
+                return Vector2.zero;
         }
     }
 
@@ -173,14 +123,14 @@ public class SteeringEnemy : MonoBehaviour
         return SteeringMath.PredictPosition(_rb.position, player.position, playerVelocity, targetMaxSpeed);
     }
 
-    public void RefreshRangeVisuals()
+    void ResizeCircles()
     {
-        ResizeCircle(rangeCircle, range);
-
-        if (slowRadiusCircle == null || slowRadiusCircle == rangeCircle)
+        if (this == null)
             return;
 
-        ResizeCircle(slowRadiusCircle, slowRadius);
+        ResizeCircle(rangeCircle, range);
+        if (slowRadiusCircle != null && slowRadiusCircle != rangeCircle)
+            ResizeCircle(slowRadiusCircle, slowRadius);
     }
 
     static void ResizeCircle(Transform circle, float radius)
@@ -198,49 +148,28 @@ public class SteeringEnemy : MonoBehaviour
             return;
 
         Vector3 scale = Vector3.one * (radius * 2f / (spriteWidth * parentScale));
-        if ((circle.localScale - scale).sqrMagnitude < 0.000001f)
-            return;
-
-        circle.localScale = scale;
-    }
-
-    void CachePlayerRigidbody()
-    {
-        if (player != null)
-            _playerRb = player.GetComponent<Rigidbody2D>();
+        if (circle.localScale != scale)
+            circle.localScale = scale;
     }
 
     // -------------------------------------------------------------------------
     // Gizmos
     // -------------------------------------------------------------------------
 
-    [SerializeField] bool showRangeGizmo = true;
-    [SerializeField] Color rangeGizmoColor = new Color(1f, 1f, 1f, 0.25f);
-    [SerializeField] Color slowRadiusGizmoColor = new Color(0.5f, 1f, 0.5f, 0.2f);
-
     void OnDrawGizmos()
     {
         if (!Application.isPlaying)
-            RefreshRangeVisuals();
+            ResizeCircles();
 
-        if (!showRangeGizmo)
-            return;
-
-        Gizmos.color = Visible(rangeGizmoColor);
-        DrawCircleGizmo(rangeCircle, transform.position, range);
+        Gizmos.color = new Color(1f, 1f, 1f, 0.9f);
+        Gizmos.DrawWireSphere(CircleCenter(rangeCircle), range);
 
         if (slowRadiusCircle == null || slowRadiusCircle == rangeCircle)
             return;
 
-        Gizmos.color = Visible(slowRadiusGizmoColor);
-        DrawCircleGizmo(slowRadiusCircle, transform.position, slowRadius);
+        Gizmos.color = new Color(0.5f, 1f, 0.5f, 0.9f);
+        Gizmos.DrawWireSphere(CircleCenter(slowRadiusCircle), slowRadius);
     }
 
-    static Color Visible(Color color) => new Color(color.r, color.g, color.b, Mathf.Max(color.a, 0.9f));
-
-    static void DrawCircleGizmo(Transform circle, Vector3 fallbackCenter, float radius)
-    {
-        Vector3 center = circle != null ? circle.position : fallbackCenter;
-        Gizmos.DrawWireSphere(center, Mathf.Max(0f, radius));
-    }
+    Vector3 CircleCenter(Transform circle) => circle != null ? circle.position : transform.position;
 }

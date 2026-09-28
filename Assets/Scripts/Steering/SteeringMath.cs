@@ -66,9 +66,6 @@ public static class SteeringMath
         rb.linearVelocity = Vector2.zero;
     }
 
-    public static bool IsOutOfRange(Vector2 from, Vector2 to, float range) =>
-        Vector2.Distance(from, to) > range;
-
     public static Vector2 SeekVelocity(Vector2 from, Vector2 to, float maxSpeed) =>
         Direction(from, to) * maxSpeed;
 
