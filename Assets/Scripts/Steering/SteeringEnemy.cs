@@ -40,6 +40,26 @@ public class SteeringEnemy : MonoBehaviour
     Rigidbody2D _rb;
     Rigidbody2D _playerRb;
     SteeringCollisionAvoidance _avoidance;
+    bool _steeringActive = true;
+
+    public Transform Player => player;
+    public bool IsSteeringActive => _steeringActive;
+
+    public void SetSteeringActive(bool active)
+    {
+        if (_steeringActive == active)
+            return;
+
+        _steeringActive = active;
+        EnsureRigidbody();
+        if (_rb == null)
+            return;
+
+        if (active)
+            _rb.position = transform.position;
+        else
+            SteeringMath.Stop(_rb);
+    }
 
     public void Bind(Transform target, SteeringMode steeringMode)
     {
@@ -49,9 +69,15 @@ public class SteeringEnemy : MonoBehaviour
         RefreshRangeVisuals();
     }
 
+    void EnsureRigidbody()
+    {
+        if (_rb == null)
+            _rb = GetComponent<Rigidbody2D>();
+    }
+
     void Awake()
     {
-        _rb = GetComponent<Rigidbody2D>();
+        EnsureRigidbody();
         _avoidance = GetComponent<SteeringCollisionAvoidance>();
         SteeringMath.SetupBody(_rb);
         CachePlayerRigidbody();
@@ -62,7 +88,7 @@ public class SteeringEnemy : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (player == null)
+        if (!_steeringActive || player == null)
             return;
 
         if (!TryGetDesiredVelocity(out Vector2 desired))
