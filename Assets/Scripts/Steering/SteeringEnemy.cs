@@ -193,36 +193,20 @@ public class SteeringEnemy : MonoBehaviour
     [SerializeField] Color rangeGizmoColor = new Color(1f, 1f, 1f, 0.25f);
     [SerializeField] Color slowRadiusGizmoColor = new Color(0.5f, 1f, 0.5f, 0.2f);
 
-    void OnDrawGizmosSelected()
+    void OnDrawGizmos()
     {
-        if (!showRangeGizmo)
+        if (!showRangeGizmo || GetComponent<WaypointPatrolChase>() != null)
             return;
 
-        Vector3 center = transform.position;
+        Vector3 center = Application.isPlaying && _rb != null ? (Vector3)_rb.position : transform.position;
 
         Gizmos.color = rangeGizmoColor;
-        DrawGizmoCircle(center, range);
+        Gizmos.DrawWireSphere(center, range);
 
-        if (mode != SteeringMode.Arrival || slowRadiusCircle == rangeCircle)
+        if (mode != SteeringMode.Arrival)
             return;
 
         Gizmos.color = slowRadiusGizmoColor;
-        DrawGizmoCircle(center, slowRadius);
-    }
-
-    static void DrawGizmoCircle(Vector3 center, float radius)
-    {
-        if (radius <= 0f)
-            return;
-
-        const int segments = 24;
-        Vector2 previous = (Vector2)center + Vector2.right * radius;
-        for (int i = 1; i <= segments; i++)
-        {
-            float angle = i * Mathf.PI * 2f / segments;
-            Vector2 next = (Vector2)center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
-            Gizmos.DrawLine(previous, next);
-            previous = next;
-        }
+        Gizmos.DrawWireSphere(center, slowRadius);
     }
 }

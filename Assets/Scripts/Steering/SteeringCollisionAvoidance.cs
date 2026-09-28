@@ -21,30 +21,66 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     [SerializeField] float obstaclePadding = 0.4f;
 
     CircleCollider2D body;
+    Vector2 _committedWorldTangent;
 
-    public Vector2 GetAvoidanceForce(
+    /// <summary>
+    /// If the goal is blocked head-on, replaces desired with one slide direction.
+    /// Otherwise returns desired and an optional push-out in <paramref name="extraForce"/>.
+    /// </summary>
+    public Vector2 ResolveDesired(
         Vector2 position,
         Vector2 velocity,
         Vector2 desiredVelocity,
-        float maxSpeed)
+        float maxSpeed,
+        out Vector2 extraForce)
     {
+        extraForce = Vector2.zero;
+
         Vector2 lookDirection = PickLookDirection(velocity, desiredVelocity);
         float lookDistance = LookAheadDistance(velocity, desiredVelocity, maxSpeed);
-
-        Vector2 force = Vector2.zero;
-        bool foundWall = false;
         Vector2 wallNormal = default;
         Vector2 wallContact = default;
+        bool foundWall = false;
+        Vector2 resolved = desiredVelocity;
 
-        if (lookDirection.sqrMagnitude >= SteeringMath.Epsilon
-            && TryFindWall(position, lookDirection, lookDistance, out wallNormal, out wallContact))
+        if (desiredVelocity.sqrMagnitude > SteeringMath.Epsilon)
         {
-            foundWall = true;
-            force = ComputeAvoidForce(wallNormal, desiredVelocity);
+            Vector2 goalDir = desiredVelocity.normalized;
+            bool goalBlocked = !IsGoalClear(position, goalDir, lookDistance);
+            float speed = desiredVelocity.magnitude;
+
+            if (goalBlocked
+                && TryFindWall(position, goalDir, lookDistance, desiredVelocity, out wallNormal, out wallContact))
+            {
+                foundWall = true;
+                bool facingWall = Vector2.Dot(goalDir, -wallNormal) >= SlideWhenFacingWall;
+                if (facingWall || _committedWorldTangent.sqrMagnitude > SteeringMath.Epsilon)
+                {
+                    resolved = GetCommittedTangent(wallNormal, goalDir) * speed;
+                    StoreGizmoSample(position, goalDir, lookDistance, resolved);
+                    return resolved;
+                }
+            }
+            else if (goalBlocked && _committedWorldTangent.sqrMagnitude > SteeringMath.Epsilon)
+            {
+                resolved = _committedWorldTangent * speed;
+                StoreGizmoSample(position, goalDir, lookDistance, resolved);
+                return resolved;
+            }
+
+            if (!goalBlocked)
+                _committedWorldTangent = Vector2.zero;
         }
 
-        StoreGizmoSample(position, lookDirection, lookDistance, foundWall, wallNormal, wallContact, force);
-        return force;
+        if (lookDirection.sqrMagnitude >= SteeringMath.Epsilon
+            && TryFindWall(position, lookDirection, lookDistance, desiredVelocity, out wallNormal, out wallContact))
+        {
+            foundWall = true;
+            extraForce = wallNormal * maxAvoidForce;
+        }
+
+        StoreGizmoSample(position, lookDirection, lookDistance, resolved);
+        return resolved;
     }
 
     public Vector2 PreventMovingIntoWalls(Vector2 position, Vector2 velocity)
@@ -93,23 +129,45 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         Vector2 position,
         Vector2 direction,
         float lookDistance,
+        Vector2 desiredVelocity,
         out Vector2 wallNormal,
         out Vector2 wallContact)
     {
+        wallNormal = default;
+        wallContact = default;
+
         float radius = KeepOutRadius();
+        Vector2 goalDir = desiredVelocity.sqrMagnitude > SteeringMath.Epsilon
+            ? desiredVelocity.normalized
+            : direction;
 
         Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, radius, obstacleLayers);
+        float bestBlock = -1f;
+        bool foundOverlap = false;
         for (int i = 0; i < overlaps.Length; i++)
         {
             Collider2D wall = overlaps[i];
             if (wall == null || wall == body)
                 continue;
 
-            wallContact = wall.ClosestPoint(position);
-            Vector2 away = position - wallContact;
-            wallNormal = away.sqrMagnitude > SteeringMath.Epsilon ? away.normalized : Vector2.up;
-            return true;
+            Vector2 contact = wall.ClosestPoint(position);
+            Vector2 away = position - contact;
+            if (away.sqrMagnitude < SteeringMath.Epsilon)
+                continue;
+
+            Vector2 normal = away.normalized;
+            float block = Vector2.Dot(goalDir, -normal);
+            if (block <= bestBlock)
+                continue;
+
+            bestBlock = block;
+            wallContact = contact;
+            wallNormal = normal;
+            foundOverlap = true;
         }
+
+        if (foundOverlap)
+            return true;
 
         RaycastHit2D hit = Physics2D.CircleCast(position, radius, direction, lookDistance, obstacleLayers);
         if (hit.collider == null || hit.collider == body || hit.normal.sqrMagnitude < SteeringMath.Epsilon)
@@ -124,22 +182,43 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         return true;
     }
 
-    Vector2 ComputeAvoidForce(Vector2 wallNormal, Vector2 desiredVelocity)
+    bool IsGoalClear(Vector2 position, Vector2 goalDir, float lookDistance)
     {
-        Vector2 pushOut = wallNormal * maxAvoidForce;
+        if (goalDir.sqrMagnitude < SteeringMath.Epsilon || lookDistance <= 0f)
+            return true;
 
-        if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
-            return pushOut;
+        float radius = KeepOutRadius();
+        RaycastHit2D hit = Physics2D.CircleCast(position, radius, goalDir, lookDistance, obstacleLayers);
+        return hit.collider == null || hit.collider == body;
+    }
 
-        Vector2 intoWall = -wallNormal;
-        if (Vector2.Dot(desiredVelocity.normalized, intoWall) < SlideWhenFacingWall)
-            return pushOut;
+    Vector2 GetCommittedTangent(Vector2 wallNormal, Vector2 goalDir)
+    {
+        Vector2 tangent = new Vector2(-wallNormal.y, wallNormal.x);
+        if (_committedWorldTangent.sqrMagnitude >= SteeringMath.Epsilon)
+        {
+            if (Vector2.Dot(tangent, _committedWorldTangent) < 0f)
+                tangent = -tangent;
+        }
+        else
+            tangent *= PickSideSign(wallNormal, goalDir);
 
-        Vector2 alongWall = desiredVelocity - intoWall * Vector2.Dot(desiredVelocity, intoWall);
-        if (alongWall.sqrMagnitude < SteeringMath.Epsilon)
-            alongWall = Vector2.Perpendicular(wallNormal);
+        _committedWorldTangent = tangent.normalized;
+        return _committedWorldTangent;
+    }
 
-        return alongWall.normalized * maxAvoidForce + pushOut;
+    int PickSideSign(Vector2 wallNormal, Vector2 goalDir)
+    {
+        float cross = wallNormal.x * goalDir.y - wallNormal.y * goalDir.x;
+        if (Mathf.Abs(cross) > 0.05f)
+            return cross > 0f ? 1 : -1;
+
+        Vector2 tangent = new Vector2(-wallNormal.y, wallNormal.x);
+        float along = Vector2.Dot(tangent, goalDir);
+        if (Mathf.Abs(along) > 0.05f)
+            return along >= 0f ? 1 : -1;
+
+        return (GetInstanceID() & 1) == 0 ? 1 : -1;
     }
 
     float BodyRadius()
@@ -170,7 +249,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Gizmos — yellow = look-ahead, green = wall normal, magenta = force, red = keep-out
+    // Gizmos — yellow = circle cast, magenta = velocity actually used
     // -------------------------------------------------------------------------
 
     [SerializeField] bool showGizmos = true;
@@ -179,28 +258,15 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     Vector2 gizmoPosition;
     Vector2 gizmoDirection;
     float gizmoLookDistance;
-    bool gizmoFoundWall;
-    Vector2 gizmoWallNormal;
-    Vector2 gizmoWallContact;
-    Vector2 gizmoForce;
+    Vector2 gizmoVelocity;
 
-    void StoreGizmoSample(
-        Vector2 position,
-        Vector2 lookDirection,
-        float lookDistance,
-        bool foundWall,
-        Vector2 wallNormal,
-        Vector2 wallContact,
-        Vector2 force)
+    void StoreGizmoSample(Vector2 position, Vector2 lookDirection, float lookDistance, Vector2 velocity)
     {
         gizmoHasSample = true;
         gizmoPosition = position;
         gizmoDirection = lookDirection;
         gizmoLookDistance = lookDistance;
-        gizmoFoundWall = foundWall;
-        gizmoWallNormal = wallNormal;
-        gizmoWallContact = wallContact;
-        gizmoForce = force;
+        gizmoVelocity = velocity;
     }
 
     void OnDrawGizmos()
@@ -211,78 +277,20 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         Vector2 origin = gizmoHasSample ? gizmoPosition : (Vector2)transform.position;
         float radius = KeepOutRadius();
 
-        Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.85f);
-        DrawGizmoCircle(origin, radius);
+        Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.9f);
+        Gizmos.DrawWireSphere(origin, radius);
 
-        if (!gizmoHasSample || gizmoDirection.sqrMagnitude < SteeringMath.Epsilon)
+        if (gizmoHasSample && gizmoDirection.sqrMagnitude > SteeringMath.Epsilon && gizmoLookDistance > 0f)
         {
-            Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.35f);
-            DrawGizmoCircle(origin, maxSeeAhead);
-            DrawGizmoKeepOutNormals(origin);
-            return;
+            Vector2 ahead = origin + gizmoDirection * gizmoLookDistance;
+            Gizmos.DrawLine(origin, ahead);
+            Gizmos.DrawWireSphere(ahead, radius);
         }
 
-        Vector2 ahead = origin + gizmoDirection * gizmoLookDistance;
-        Gizmos.DrawLine(origin, ahead);
-        DrawGizmoCircle(ahead, radius);
-
-        if (gizmoFoundWall)
-        {
-            Gizmos.color = new Color(0.2f, 0.95f, 0.35f);
-            DrawGizmoArrow(gizmoWallContact, gizmoWallNormal);
-        }
-
-        Gizmos.color = new Color(0.9f, 0.35f, 1f);
-        if (gizmoForce.sqrMagnitude > SteeringMath.Epsilon)
-            DrawGizmoArrow(origin, gizmoForce.normalized * 1.5f);
-
-        DrawGizmoKeepOutNormals(origin);
-    }
-
-    void DrawGizmoKeepOutNormals(Vector2 origin)
-    {
-        Collider2D[] overlaps = Physics2D.OverlapCircleAll(origin, KeepOutRadius(), obstacleLayers);
-        Gizmos.color = new Color(1f, 0.3f, 0.3f);
-
-        for (int i = 0; i < overlaps.Length; i++)
-        {
-            if (!TryGetOutOfWall(origin, overlaps[i], out Vector2 outOfWall))
-                continue;
-
-            Vector2 closest = overlaps[i].ClosestPoint(origin);
-            DrawGizmoArrow(closest, outOfWall * 0.75f);
-        }
-    }
-
-    static void DrawGizmoArrow(Vector2 from, Vector2 vector)
-    {
-        if (vector.sqrMagnitude < SteeringMath.Epsilon)
+        if (gizmoVelocity.sqrMagnitude <= SteeringMath.Epsilon)
             return;
 
-        Vector2 tip = from + vector;
-        Gizmos.DrawLine(from, tip);
-
-        Vector2 direction = vector.normalized;
-        float head = Mathf.Min(0.2f, vector.magnitude * 0.3f);
-        Vector2 wing = Vector2.Perpendicular(direction) * head;
-        Vector2 back = tip - direction * head;
-        Gizmos.DrawLine(tip, back + wing);
-        Gizmos.DrawLine(tip, back - wing);
-    }
-
-    static void DrawGizmoCircle(Vector2 center, float radius)
-    {
-        if (radius <= 0f)
-            return;
-
-        const int segments = 24;
-        Vector2 previous = center + Vector2.right * radius;
-        for (int i = 1; i <= segments; i++)
-        {
-            float angle = i * Mathf.PI * 2f / segments;
-            Vector2 next = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
-            Gizmos.DrawLine(previous, next);
-            previous = next;
-        }
+        Gizmos.color = new Color(0.9f, 0.35f, 1f, 0.95f);
+        Gizmos.DrawLine(origin, origin + gizmoVelocity);
     }
 }

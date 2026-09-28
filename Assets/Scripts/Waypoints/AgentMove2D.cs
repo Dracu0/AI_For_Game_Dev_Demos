@@ -1,14 +1,15 @@
 using UnityEngine;
 
 /// <summary>
-/// Kinematic-style moves that keep <see cref="Rigidbody2D"/> and transform in sync.
+/// Straight-line move that stays in sync with a Rigidbody2D. Call from FixedUpdate.
 /// </summary>
 public static class AgentMove2D
 {
     public static void MoveTowards(Transform transform, Rigidbody2D rb, Vector2 goal, float speed)
     {
+        float step = speed * Time.fixedDeltaTime;
         Vector2 pos = rb != null ? rb.position : (Vector2)transform.position;
-        Vector2 next = Vector2.MoveTowards(pos, goal, speed * Time.deltaTime);
+        Vector2 next = Vector2.MoveTowards(pos, goal, step);
 
         if (rb != null)
         {

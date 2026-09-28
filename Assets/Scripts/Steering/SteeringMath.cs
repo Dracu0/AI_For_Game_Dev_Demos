@@ -34,9 +34,9 @@ public static class SteeringMath
         Vector2 current = rb.linearVelocity;
         float deltaTime = Time.fixedDeltaTime;
 
-        Vector2 avoidanceForce = avoidance != null
-            ? avoidance.GetAvoidanceForce(position, current, desiredVelocity, maxSpeed)
-            : Vector2.zero;
+        Vector2 avoidanceForce = Vector2.zero;
+        if (avoidance != null)
+            desiredVelocity = avoidance.ResolveDesired(position, current, desiredVelocity, maxSpeed, out avoidanceForce);
 
         Vector2 steering = Vector2.ClampMagnitude(
             desiredVelocity - current + avoidanceForce,
