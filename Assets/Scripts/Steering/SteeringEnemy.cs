@@ -63,6 +63,17 @@ public class SteeringEnemy : MonoBehaviour
             SteeringMath.Stop(_rb);
     }
 
+    public void SteerToward(Vector2 target, float speed)
+    {
+        if (_rb == null)
+            _rb = GetComponent<Rigidbody2D>();
+        if (_rb == null)
+            return;
+
+        Vector2 desired = SteeringMath.SeekVelocity(_rb.position, target, speed);
+        _rb.linearVelocity = SteeringMath.Steer(_rb, desired, maxForce, speed, _avoidance);
+    }
+
     void Awake()
     {
         _rb = GetComponent<Rigidbody2D>();

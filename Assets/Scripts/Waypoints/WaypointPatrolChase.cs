@@ -76,7 +76,7 @@ public class WaypointPatrolChase : MonoBehaviour
         _wait = 0f;
         _steering.SetSteeringActive(false);
         _patrol.SetActive(false);
-        SetBody(steering: false);
+        SetBody(steering: true);
 
         if (_rb != null)
             transform.position = _rb.position;
@@ -84,11 +84,15 @@ public class WaypointPatrolChase : MonoBehaviour
 
     void MoveToLastSeen()
     {
-        if (!AgentMove2D.StepTowards(transform, _rb, _lastSeen, investigateSpeed, arriveDistance))
+        if (Vector2.Distance(_rb.position, _lastSeen) <= arriveDistance)
+        {
+            SetBody(steering: false);
+            _phase = Phase.Wait;
+            _wait = 0f;
             return;
+        }
 
-        _phase = Phase.Wait;
-        _wait = 0f;
+        _steering.SteerToward(_lastSeen, investigateSpeed);
     }
 
     void WaitThenPatrol()
