@@ -42,15 +42,19 @@ public class WaypointPatrolChase : MonoBehaviour
             return;
         }
 
-        if (_phase == Phase.Chase)
-            SetPhase(Phase.LastSeen);
-        else if (_phase == Phase.LastSeen && Vector2.Distance(_rb.position, _lastSeen) <= arriveDistance)
-            SetPhase(Phase.Wait);
-        else if (_phase == Phase.Wait)
+        switch (_phase)
         {
-            _wait += Time.fixedDeltaTime;
-            if (_wait >= returnToPatrolDelay)
-                SetPhase(Phase.Patrol);
+            case Phase.Chase:
+                SetPhase(Phase.LastSeen);
+                break;
+            case Phase.LastSeen when Vector2.Distance(_rb.position, _lastSeen) <= arriveDistance:
+                SetPhase(Phase.Wait);
+                break;
+            case Phase.Wait:
+                _wait += Time.fixedDeltaTime;
+                if (_wait >= returnToPatrolDelay)
+                    SetPhase(Phase.Patrol);
+                break;
         }
     }
 

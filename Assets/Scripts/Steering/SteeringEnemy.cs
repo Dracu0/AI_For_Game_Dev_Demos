@@ -96,14 +96,7 @@ public class SteeringEnemy : MonoBehaviour
         if (!_active)
             return;
 
-        if (_moveToPoint)
-        {
-            Vector2 toPoint = SteeringMath.SeekVelocity(_rb.position, _point, maxSpeed);
-            _rb.linearVelocity = SteeringMath.Steer(_rb, toPoint, maxForce, maxSpeed, _avoidance);
-            return;
-        }
-
-        if (player == null || Vector2.Distance(_rb.position, player.position) > range)
+        if (!_moveToPoint && (player == null || Vector2.Distance(_rb.position, player.position) > range))
         {
             SteeringMath.Stop(_rb);
             return;
@@ -114,6 +107,9 @@ public class SteeringEnemy : MonoBehaviour
 
     Vector2 DesiredVelocity()
     {
+        if (_moveToPoint)
+            return SteeringMath.SeekVelocity(_rb.position, _point, maxSpeed);
+
         Vector2 from = _rb.position;
         Vector2 to = player.position;
 

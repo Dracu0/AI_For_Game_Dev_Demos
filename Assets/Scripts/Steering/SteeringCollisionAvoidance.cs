@@ -30,6 +30,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         Vector2 lookDirection = LookDirection(velocity, desiredVelocity);
         float lookDistance = LookDistance(velocity, desiredVelocity, maxSpeed);
         Vector2 resolved = desiredVelocity;
+        bool sliding = false;
 
         if (desiredVelocity.sqrMagnitude > SteeringMath.Epsilon)
         {
@@ -37,28 +38,25 @@ public class SteeringCollisionAvoidance : MonoBehaviour
             float speed = desiredVelocity.magnitude;
             bool blocked = !GoalIsClear(position, goalDir, lookDistance);
 
-            if (blocked && TryFindWall(position, goalDir, lookDistance, desiredVelocity, out Vector2 wallNormal))
+            if (blocked && TryFindWall(position, goalDir, lookDistance, desiredVelocity, out Vector2 wallNormal)
+                && (Vector2.Dot(goalDir, -wallNormal) >= HeadOn || _slideDirection != Vector2.zero))
             {
-                bool headOn = Vector2.Dot(goalDir, -wallNormal) >= HeadOn;
-                if (headOn || _slideDirection != Vector2.zero)
-                {
-                    resolved = SlideDirection(wallNormal, goalDir) * speed;
-                    Remember(position, goalDir, lookDistance, resolved);
-                    return resolved;
-                }
+                resolved = SlideDirection(wallNormal, goalDir) * speed;
+                lookDirection = goalDir;
+                sliding = true;
             }
             else if (blocked && _slideDirection != Vector2.zero)
             {
                 resolved = _slideDirection * speed;
-                Remember(position, goalDir, lookDistance, resolved);
-                return resolved;
+                lookDirection = goalDir;
+                sliding = true;
             }
-
-            if (!blocked)
+            else if (!blocked)
                 _slideDirection = Vector2.zero;
         }
 
-        if (lookDirection != Vector2.zero
+        if (!sliding
+            && lookDirection != Vector2.zero
             && TryFindWall(position, lookDirection, lookDistance, desiredVelocity, out Vector2 normal))
             extraForce = normal * maxAvoidForce;
 
