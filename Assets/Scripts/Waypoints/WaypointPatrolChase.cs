@@ -18,6 +18,8 @@ public class WaypointPatrolChase : MonoBehaviour
     }
 
     [SerializeField] float detectionRadius = 5f;
+
+    public float DetectionRadius => detectionRadius;
     [SerializeField] float returnToPatrolDelay = 2f;
     [SerializeField] float investigateSpeed = 3f;
     [SerializeField] float investigateArriveDistance = 0.15f;
@@ -39,12 +41,45 @@ public class WaypointPatrolChase : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
     }
 
+    void OnValidate()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.delayCall += DelayedSyncRangeVisual;
+#else
+        SyncRangeVisual();
+#endif
+    }
+
+#if UNITY_EDITOR
+    void DelayedSyncRangeVisual()
+    {
+        if (this == null)
+            return;
+
+        SyncRangeVisual();
+    }
+#endif
+
+    void SyncRangeVisual()
+    {
+        if (_steering == null)
+            _steering = GetComponent<SteeringEnemy>();
+
+        if (_steering != null)
+            _steering.RefreshRangeVisuals();
+    }
+
+#if UNITY_EDITOR
+    void Reset() => SyncRangeVisual();
+#endif
+
     void Start()
     {
         SetDrivenBySteering(false);
         _steering.SetSteeringActive(false);
         _patrol.SetPatrolActive(true);
         _phase = Phase.Patrolling;
+        _steering.RefreshRangeVisuals();
     }
 
     void FixedUpdate()
@@ -160,23 +195,18 @@ public class WaypointPatrolChase : MonoBehaviour
     // Gizmos
     // -------------------------------------------------------------------------
 
-    [SerializeField] bool showDetectionGizmo = true;
-    [SerializeField] Color detectionGizmoColor = new Color(1f, 0.35f, 0.35f, 0.35f);
     [SerializeField] bool showLastSeenGizmo = true;
     [SerializeField] Color lastSeenGizmoColor = new Color(1f, 0.6f, 0.2f, 0.85f);
 
     void OnDrawGizmos()
     {
-        Vector3 origin = Application.isPlaying && _rb != null ? (Vector3)_rb.position : transform.position;
-
-        if (showDetectionGizmo)
-        {
-            Gizmos.color = detectionGizmoColor;
-            Gizmos.DrawWireSphere(origin, detectionRadius);
-        }
+        if (!Application.isPlaying)
+            SyncRangeVisual();
 
         if (!showLastSeenGizmo || _phase != Phase.InvestigateMove && _phase != Phase.InvestigateWait)
             return;
+
+        Vector3 origin = transform.position;
 
         Gizmos.color = lastSeenGizmoColor;
         Gizmos.DrawWireSphere(_lastSeenPosition, investigateArriveDistance);

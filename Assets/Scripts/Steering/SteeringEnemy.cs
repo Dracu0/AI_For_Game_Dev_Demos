@@ -153,9 +153,15 @@ public class SteeringEnemy : MonoBehaviour
         return SteeringMath.PredictPosition(_rb.position, player.position, playerVelocity, targetMaxSpeed);
     }
 
-    void RefreshRangeVisuals()
+    public float GetEffectiveRange()
     {
-        ResizeCircle(rangeCircle, range);
+        WaypointPatrolChase chase = GetComponent<WaypointPatrolChase>();
+        return chase != null ? chase.DetectionRadius : range;
+    }
+
+    public void RefreshRangeVisuals()
+    {
+        ResizeCircle(rangeCircle, GetEffectiveRange());
 
         if (slowRadiusCircle == null || slowRadiusCircle == rangeCircle)
             return;
@@ -195,18 +201,36 @@ public class SteeringEnemy : MonoBehaviour
 
     void OnDrawGizmos()
     {
-        if (!showRangeGizmo || GetComponent<WaypointPatrolChase>() != null)
+        if (!showRangeGizmo)
             return;
 
-        Vector3 center = Application.isPlaying && _rb != null ? (Vector3)_rb.position : transform.position;
+        if (!Application.isPlaying)
+            RefreshRangeVisuals();
 
+        float shownRange = GetEffectiveRange();
         Gizmos.color = rangeGizmoColor;
-        Gizmos.DrawWireSphere(center, range);
+        DrawCircleGizmo(rangeCircle, transform.position, shownRange);
 
-        if (mode != SteeringMode.Arrival)
+        if (mode != SteeringMode.Arrival || slowRadiusCircle == rangeCircle)
             return;
 
         Gizmos.color = slowRadiusGizmoColor;
-        Gizmos.DrawWireSphere(center, slowRadius);
+        DrawCircleGizmo(slowRadiusCircle, transform.position, slowRadius);
+    }
+
+    static void DrawCircleGizmo(Transform circle, Vector3 fallbackCenter, float fallbackRadius)
+    {
+        if (circle != null)
+        {
+            SpriteRenderer sprite = circle.GetComponent<SpriteRenderer>();
+            if (sprite != null && sprite.sprite != null)
+            {
+                Bounds bounds = sprite.bounds;
+                Gizmos.DrawWireSphere(bounds.center, bounds.extents.x);
+                return;
+            }
+        }
+
+        Gizmos.DrawWireSphere(fallbackCenter, fallbackRadius);
     }
 }
