@@ -42,6 +42,8 @@ public class SteeringEnemy : MonoBehaviour
     Rigidbody2D _playerRb;
     SteeringCollisionAvoidance _avoidance;
     bool _active = true;
+    bool _moveToPoint;
+    Vector2 _point;
 
     public Transform Player => player;
     public float Range => range;
@@ -63,16 +65,13 @@ public class SteeringEnemy : MonoBehaviour
             SteeringMath.Stop(_rb);
     }
 
-    public void SteerToward(Vector2 target, float speed)
+    public void SetMoveTarget(Vector2 point)
     {
-        if (_rb == null)
-            _rb = GetComponent<Rigidbody2D>();
-        if (_rb == null)
-            return;
-
-        Vector2 desired = SteeringMath.SeekVelocity(_rb.position, target, speed);
-        _rb.linearVelocity = SteeringMath.Steer(_rb, desired, maxForce, speed, _avoidance);
+        _moveToPoint = true;
+        _point = point;
     }
+
+    public void ClearMoveTarget() => _moveToPoint = false;
 
     void Awake()
     {
@@ -94,10 +93,17 @@ public class SteeringEnemy : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (!_active || player == null)
+        if (!_active)
             return;
 
-        if (Vector2.Distance(_rb.position, player.position) > range)
+        if (_moveToPoint)
+        {
+            Vector2 toPoint = SteeringMath.SeekVelocity(_rb.position, _point, maxSpeed);
+            _rb.linearVelocity = SteeringMath.Steer(_rb, toPoint, maxForce, maxSpeed, _avoidance);
+            return;
+        }
+
+        if (player == null || Vector2.Distance(_rb.position, player.position) > range)
         {
             SteeringMath.Stop(_rb);
             return;

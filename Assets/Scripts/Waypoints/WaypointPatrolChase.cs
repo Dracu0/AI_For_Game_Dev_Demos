@@ -1,8 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Patrols until the player enters the detection radius, then steers.
-/// When the player leaves, walks to the last seen point, waits, then patrols again.
+/// Patrol, chase, walk to the last seen point, wait, then patrol from the nearest waypoint.
 /// </summary>
 [RequireComponent(typeof(WaypointPatrol), typeof(SteeringEnemy))]
 [DefaultExecutionOrder(-10)]
@@ -11,14 +10,13 @@ public class WaypointPatrolChase : MonoBehaviour
     enum Phase { Patrol, Chase, LastSeen, Wait }
 
     [SerializeField] float returnToPatrolDelay = 2f;
-    [SerializeField] float investigateSpeed = 3f;
     [SerializeField] float arriveDistance = 0.15f;
 
     WaypointPatrol _patrol;
     SteeringEnemy _steering;
     Rigidbody2D _rb;
 
-    Phase _phase = Phase.Patrol;
+    Phase _phase;
     Vector2 _lastSeen;
     float _wait;
 
@@ -29,7 +27,7 @@ public class WaypointPatrolChase : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
     }
 
-    void Start() => BeginPatrol();
+    void Start() => Apply(Phase.Patrol);
 
     void FixedUpdate()
     {
@@ -37,89 +35,50 @@ public class WaypointPatrolChase : MonoBehaviour
         if (player == null)
             return;
 
-        Vector2 pos = _rb != null ? _rb.position : (Vector2)transform.position;
-        if (Vector2.Distance(pos, player.position) <= _steering.Range)
+        if (Vector2.Distance(_rb.position, player.position) <= _steering.Range)
         {
             _lastSeen = player.position;
-            BeginChase();
+            SetPhase(Phase.Chase);
             return;
         }
 
-        switch (_phase)
-        {
-            case Phase.Chase:
-                BeginLastSeen();
-                break;
-            case Phase.LastSeen:
-                MoveToLastSeen();
-                break;
-            case Phase.Wait:
-                WaitThenPatrol();
-                break;
-        }
-    }
-
-    void BeginChase()
-    {
         if (_phase == Phase.Chase)
-            return;
-
-        _phase = Phase.Chase;
-        _patrol.SetActive(false);
-        SetBody(steering: true);
-        _steering.SetSteeringActive(true);
-    }
-
-    void BeginLastSeen()
-    {
-        _phase = Phase.LastSeen;
-        _wait = 0f;
-        _steering.SetSteeringActive(false);
-        _patrol.SetActive(false);
-        SetBody(steering: true);
-
-        if (_rb != null)
-            transform.position = _rb.position;
-    }
-
-    void MoveToLastSeen()
-    {
-        if (Vector2.Distance(_rb.position, _lastSeen) <= arriveDistance)
+            SetPhase(Phase.LastSeen);
+        else if (_phase == Phase.LastSeen && Vector2.Distance(_rb.position, _lastSeen) <= arriveDistance)
+            SetPhase(Phase.Wait);
+        else if (_phase == Phase.Wait)
         {
-            SetBody(steering: false);
-            _phase = Phase.Wait;
-            _wait = 0f;
-            return;
+            _wait += Time.fixedDeltaTime;
+            if (_wait >= returnToPatrolDelay)
+                SetPhase(Phase.Patrol);
         }
-
-        _steering.SteerToward(_lastSeen, investigateSpeed);
     }
 
-    void WaitThenPatrol()
+    void SetPhase(Phase phase)
     {
-        if (_rb != null)
-            _rb.linearVelocity = Vector2.zero;
-
-        _wait += Time.fixedDeltaTime;
-        if (_wait >= returnToPatrolDelay)
-            BeginPatrol();
-    }
-
-    void BeginPatrol()
-    {
-        _phase = Phase.Patrol;
-        SetBody(steering: false);
-        _steering.SetSteeringActive(false);
-        _patrol.SetActive(true);
-    }
-
-    void SetBody(bool steering)
-    {
-        if (_rb == null)
+        if (_phase == phase)
             return;
 
+        Apply(phase);
+    }
+
+    void Apply(Phase phase)
+    {
+        _phase = phase;
+
+        bool steering = phase == Phase.Chase || phase == Phase.LastSeen;
         _rb.bodyType = steering ? RigidbodyType2D.Dynamic : RigidbodyType2D.Kinematic;
         _rb.linearVelocity = Vector2.zero;
+
+        _steering.SetSteeringActive(steering);
+        if (phase == Phase.LastSeen)
+            _steering.SetMoveTarget(_lastSeen);
+        else
+            _steering.ClearMoveTarget();
+
+        _patrol.SetActive(phase == Phase.Patrol);
+        if (phase == Phase.Wait)
+            _wait = 0f;
     }
 
     // -------------------------------------------------------------------------
@@ -131,9 +90,8 @@ public class WaypointPatrolChase : MonoBehaviour
         if (_phase != Phase.LastSeen && _phase != Phase.Wait)
             return;
 
-        Vector3 origin = Application.isPlaying && _rb != null ? (Vector3)_rb.position : transform.position;
         Gizmos.color = new Color(1f, 0.6f, 0.2f, 0.9f);
         Gizmos.DrawWireSphere(_lastSeen, arriveDistance);
-        Gizmos.DrawLine(origin, _lastSeen);
+        Gizmos.DrawLine(_rb != null ? (Vector3)_rb.position : transform.position, _lastSeen);
     }
 }

@@ -25,6 +25,29 @@ public class WaypointPatrol : MonoBehaviour
 
         _rb.linearVelocity = Vector2.zero;
         transform.position = _rb.position;
+        _index = ClosestIndex();
+    }
+
+    int ClosestIndex()
+    {
+        int closest = 0;
+        float best = float.MaxValue;
+        Vector2 pos = _rb != null ? _rb.position : (Vector2)transform.position;
+
+        for (int i = 0; waypoints != null && i < waypoints.Length; i++)
+        {
+            if (waypoints[i] == null)
+                continue;
+
+            float distance = Vector2.Distance(pos, waypoints[i].Position);
+            if (distance >= best)
+                continue;
+
+            best = distance;
+            closest = i;
+        }
+
+        return closest;
     }
 
     void FixedUpdate()
