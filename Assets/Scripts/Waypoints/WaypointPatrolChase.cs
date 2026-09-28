@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Patrol until the player enters detection, then steering.
+/// Patrol until the player enters SteeringEnemy's detection radius, then steering.
 /// When the player leaves, walk to the last seen point, wait, then patrol again.
 /// </summary>
 [RequireComponent(typeof(WaypointPatrol), typeof(SteeringEnemy))]
@@ -10,12 +10,9 @@ public class WaypointPatrolChase : MonoBehaviour
 {
     enum Phase { Patrol, Chase, GoToLastSeen, Wait }
 
-    [SerializeField] float detectionRadius = 5f;
     [SerializeField] float returnToPatrolDelay = 2f;
     [SerializeField] float investigateSpeed = 3f;
     [SerializeField] float arriveDistance = 0.15f;
-
-    public float DetectionRadius => detectionRadius;
 
     WaypointPatrol _patrol;
     SteeringEnemy _steering;
@@ -46,7 +43,7 @@ public class WaypointPatrolChase : MonoBehaviour
             return;
 
         Vector2 pos = _rb != null ? _rb.position : (Vector2)transform.position;
-        if (Vector2.Distance(pos, player.position) <= detectionRadius)
+        if (Vector2.Distance(pos, player.position) <= _steering.Range)
         {
             _lastSeen = player.position;
             StartChase();
@@ -131,8 +128,9 @@ public class WaypointPatrolChase : MonoBehaviour
         if (!showLastSeenGizmo || _phase != Phase.GoToLastSeen && _phase != Phase.Wait)
             return;
 
+        Vector3 origin = Application.isPlaying && _rb != null ? (Vector3)_rb.position : transform.position;
         Gizmos.color = lastSeenGizmoColor;
         Gizmos.DrawWireSphere(_lastSeen, arriveDistance);
-        Gizmos.DrawLine(transform.position, _lastSeen);
+        Gizmos.DrawLine(origin, _lastSeen);
     }
 }

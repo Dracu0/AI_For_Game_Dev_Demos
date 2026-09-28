@@ -40,7 +40,6 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         float lookDistance = LookAheadDistance(velocity, desiredVelocity, maxSpeed);
         Vector2 wallNormal = default;
         Vector2 wallContact = default;
-        bool foundWall = false;
         Vector2 resolved = desiredVelocity;
 
         if (desiredVelocity.sqrMagnitude > SteeringMath.Epsilon)
@@ -52,7 +51,6 @@ public class SteeringCollisionAvoidance : MonoBehaviour
             if (goalBlocked
                 && TryFindWall(position, goalDir, lookDistance, desiredVelocity, out wallNormal, out wallContact))
             {
-                foundWall = true;
                 bool facingWall = Vector2.Dot(goalDir, -wallNormal) >= SlideWhenFacingWall;
                 if (facingWall || _committedWorldTangent.sqrMagnitude > SteeringMath.Epsilon)
                 {
@@ -75,7 +73,6 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         if (lookDirection.sqrMagnitude >= SteeringMath.Epsilon
             && TryFindWall(position, lookDirection, lookDistance, desiredVelocity, out wallNormal, out wallContact))
         {
-            foundWall = true;
             extraForce = wallNormal * maxAvoidForce;
         }
 
@@ -275,14 +272,16 @@ public class SteeringCollisionAvoidance : MonoBehaviour
             return;
 
         Vector2 origin = gizmoHasSample ? gizmoPosition : (Vector2)transform.position;
+        Vector2 direction = gizmoHasSample ? gizmoDirection : (Vector2)transform.right;
+        float lookDistance = gizmoHasSample ? gizmoLookDistance : maxSeeAhead;
         float radius = KeepOutRadius();
 
         Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.9f);
         Gizmos.DrawWireSphere(origin, radius);
 
-        if (gizmoHasSample && gizmoDirection.sqrMagnitude > SteeringMath.Epsilon && gizmoLookDistance > 0f)
+        if (direction.sqrMagnitude > SteeringMath.Epsilon && lookDistance > 0f)
         {
-            Vector2 ahead = origin + gizmoDirection * gizmoLookDistance;
+            Vector2 ahead = origin + direction.normalized * lookDistance;
             Gizmos.DrawLine(origin, ahead);
             Gizmos.DrawWireSphere(ahead, radius);
         }

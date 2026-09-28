@@ -26,8 +26,9 @@ public class SteeringEnemy : MonoBehaviour
     [SerializeField] float maxSpeed = 3f;
     [SerializeField] float maxForce = 6f;
 
-    [Header("Range")]
+    [Header("Detection")]
     [SerializeField] Transform rangeCircle;
+    [InspectorName("Detection Radius")]
     [SerializeField] float range = 5f;
 
     [Header("Arrival only")]
@@ -45,6 +46,7 @@ public class SteeringEnemy : MonoBehaviour
 
     public Transform Player => player;
     public bool IsSteeringActive => _steeringActive;
+    public float Range => range;
 
     /// <param name="bypassRangeLimit">
     /// When true, chase logic can pursue anywhere inside detection (not capped by <see cref="range"/>).
@@ -92,7 +94,25 @@ public class SteeringEnemy : MonoBehaviour
         RefreshRangeVisuals();
     }
 
-    void OnValidate() => RefreshRangeVisuals();
+    void OnValidate() => ScheduleRangeVisualRefresh();
+
+    void ScheduleRangeVisualRefresh()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.delayCall -= RefreshRangeVisualsIfAlive;
+        UnityEditor.EditorApplication.delayCall += RefreshRangeVisualsIfAlive;
+#else
+        RefreshRangeVisuals();
+#endif
+    }
+
+    void RefreshRangeVisualsIfAlive()
+    {
+        if (this == null)
+            return;
+
+        RefreshRangeVisuals();
+    }
 
     void FixedUpdate()
     {
@@ -153,15 +173,9 @@ public class SteeringEnemy : MonoBehaviour
         return SteeringMath.PredictPosition(_rb.position, player.position, playerVelocity, targetMaxSpeed);
     }
 
-    public float GetEffectiveRange()
-    {
-        WaypointPatrolChase chase = GetComponent<WaypointPatrolChase>();
-        return chase != null ? chase.DetectionRadius : range;
-    }
-
     public void RefreshRangeVisuals()
     {
-        ResizeCircle(rangeCircle, GetEffectiveRange());
+        ResizeCircle(rangeCircle, range);
 
         if (slowRadiusCircle == null || slowRadiusCircle == rangeCircle)
             return;
@@ -178,11 +192,16 @@ public class SteeringEnemy : MonoBehaviour
         if (sprite == null || sprite.sprite == null)
             return;
 
-        float diameter = sprite.sprite.bounds.size.x;
-        if (diameter <= 0f)
+        float spriteWidth = sprite.sprite.bounds.size.x;
+        float parentScale = circle.parent != null ? Mathf.Abs(circle.parent.lossyScale.x) : 1f;
+        if (spriteWidth <= 0f || parentScale <= 0f)
             return;
 
-        circle.localScale = Vector3.one * (radius * 2f / diameter);
+        Vector3 scale = Vector3.one * (radius * 2f / (spriteWidth * parentScale));
+        if ((circle.localScale - scale).sqrMagnitude < 0.000001f)
+            return;
+
+        circle.localScale = scale;
     }
 
     void CachePlayerRigidbody()
@@ -201,36 +220,27 @@ public class SteeringEnemy : MonoBehaviour
 
     void OnDrawGizmos()
     {
-        if (!showRangeGizmo)
-            return;
-
         if (!Application.isPlaying)
             RefreshRangeVisuals();
 
-        float shownRange = GetEffectiveRange();
-        Gizmos.color = rangeGizmoColor;
-        DrawCircleGizmo(rangeCircle, transform.position, shownRange);
-
-        if (mode != SteeringMode.Arrival || slowRadiusCircle == rangeCircle)
+        if (!showRangeGizmo)
             return;
 
-        Gizmos.color = slowRadiusGizmoColor;
+        Gizmos.color = Visible(rangeGizmoColor);
+        DrawCircleGizmo(rangeCircle, transform.position, range);
+
+        if (slowRadiusCircle == null || slowRadiusCircle == rangeCircle)
+            return;
+
+        Gizmos.color = Visible(slowRadiusGizmoColor);
         DrawCircleGizmo(slowRadiusCircle, transform.position, slowRadius);
     }
 
-    static void DrawCircleGizmo(Transform circle, Vector3 fallbackCenter, float fallbackRadius)
-    {
-        if (circle != null)
-        {
-            SpriteRenderer sprite = circle.GetComponent<SpriteRenderer>();
-            if (sprite != null && sprite.sprite != null)
-            {
-                Bounds bounds = sprite.bounds;
-                Gizmos.DrawWireSphere(bounds.center, bounds.extents.x);
-                return;
-            }
-        }
+    static Color Visible(Color color) => new Color(color.r, color.g, color.b, Mathf.Max(color.a, 0.9f));
 
-        Gizmos.DrawWireSphere(fallbackCenter, fallbackRadius);
+    static void DrawCircleGizmo(Transform circle, Vector3 fallbackCenter, float radius)
+    {
+        Vector3 center = circle != null ? circle.position : fallbackCenter;
+        Gizmos.DrawWireSphere(center, Mathf.Max(0f, radius));
     }
 }

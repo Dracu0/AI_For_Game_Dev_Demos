@@ -31,12 +31,20 @@ public class WaypointPatrol : MonoBehaviour
         if (!_active || waypoints == null || waypoints.Length == 0)
             return;
 
-        Waypoint target = waypoints[_index];
-        if (target == null)
-            return;
+        _index = Mathf.Clamp(_index, 0, waypoints.Length - 1);
+        for (int i = 0; i < waypoints.Length; i++)
+        {
+            Waypoint target = waypoints[_index];
+            if (target == null)
+            {
+                _index = (_index + 1) % waypoints.Length;
+                continue;
+            }
 
-        if (AgentMove2D.StepTowards(transform, _rb, target.Position, speed, arriveDistance))
-            _index = (_index + 1) % waypoints.Length;
+            if (AgentMove2D.StepTowards(transform, _rb, target.Position, speed, arriveDistance))
+                _index = (_index + 1) % waypoints.Length;
+            return;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -45,7 +53,21 @@ public class WaypointPatrol : MonoBehaviour
 
     void OnDrawGizmos()
     {
-        if (!_active || waypoints == null || waypoints.Length == 0)
+        if (waypoints == null || waypoints.Length == 0)
+            return;
+
+        Gizmos.color = new Color(0.3f, 1f, 0.45f, 0.35f);
+        for (int i = 0; i < waypoints.Length; i++)
+        {
+            Waypoint from = waypoints[i];
+            Waypoint to = waypoints[(i + 1) % waypoints.Length];
+            if (from == null || to == null)
+                continue;
+
+            Gizmos.DrawLine(from.Position, to.Position);
+        }
+
+        if (!_active)
             return;
 
         Waypoint target = waypoints[Mathf.Clamp(_index, 0, waypoints.Length - 1)];
@@ -54,7 +76,7 @@ public class WaypointPatrol : MonoBehaviour
 
         Vector3 origin = Application.isPlaying && _rb != null ? (Vector3)_rb.position : transform.position;
         Gizmos.color = new Color(0.3f, 1f, 0.45f, 0.9f);
-        Gizmos.DrawLine(origin, target.transform.position);
-        Gizmos.DrawWireSphere(target.transform.position, arriveDistance);
+        Gizmos.DrawLine(origin, target.Position);
+        Gizmos.DrawWireSphere(target.Position, arriveDistance);
     }
 }
