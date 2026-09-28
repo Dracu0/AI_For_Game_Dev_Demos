@@ -176,4 +176,45 @@ public class SteeringEnemy : MonoBehaviour
         if (player != null)
             _playerRb = player.GetComponent<Rigidbody2D>();
     }
+
+    // -------------------------------------------------------------------------
+    // Gizmos
+    // -------------------------------------------------------------------------
+
+    [SerializeField] bool showRangeGizmo = true;
+    [SerializeField] Color rangeGizmoColor = new Color(1f, 1f, 1f, 0.25f);
+    [SerializeField] Color slowRadiusGizmoColor = new Color(0.5f, 1f, 0.5f, 0.2f);
+
+    void OnDrawGizmosSelected()
+    {
+        if (!showRangeGizmo)
+            return;
+
+        Vector3 center = transform.position;
+
+        Gizmos.color = rangeGizmoColor;
+        DrawGizmoCircle(center, range);
+
+        if (mode != SteeringMode.Arrival || slowRadiusCircle == rangeCircle)
+            return;
+
+        Gizmos.color = slowRadiusGizmoColor;
+        DrawGizmoCircle(center, slowRadius);
+    }
+
+    static void DrawGizmoCircle(Vector3 center, float radius)
+    {
+        if (radius <= 0f)
+            return;
+
+        const int segments = 24;
+        Vector2 previous = (Vector2)center + Vector2.right * radius;
+        for (int i = 1; i <= segments; i++)
+        {
+            float angle = i * Mathf.PI * 2f / segments;
+            Vector2 next = (Vector2)center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+            Gizmos.DrawLine(previous, next);
+            previous = next;
+        }
+    }
 }

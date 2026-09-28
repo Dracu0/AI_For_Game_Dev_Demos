@@ -19,25 +19,8 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     [SerializeField] float maxAvoidForce = 12f;
     [Tooltip("Extra radius so agents keep a small gap from walls.")]
     [SerializeField] float obstaclePadding = 0.4f;
-    [SerializeField] bool showGizmos = true;
 
     CircleCollider2D body;
-
-    // Last FixedUpdate sample (for Scene-view gizmos).
-    bool gizmoHasSample;
-    Vector2 gizmoPosition;
-    Vector2 gizmoDirection;
-    float gizmoLookDistance;
-    bool gizmoFoundWall;
-    Vector2 gizmoWallNormal;
-    Vector2 gizmoWallContact;
-    Vector2 gizmoForce;
-
-    void Awake() => body = GetComponent<CircleCollider2D>();
-
-    // -------------------------------------------------------------------------
-    // Called from SteeringMath.Steer
-    // -------------------------------------------------------------------------
 
     public Vector2 GetAvoidanceForce(
         Vector2 position,
@@ -83,9 +66,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         return velocity;
     }
 
-    // -------------------------------------------------------------------------
-    // Look-ahead
-    // -------------------------------------------------------------------------
+    void Awake() => body = GetComponent<CircleCollider2D>();
 
     static Vector2 PickLookDirection(Vector2 velocity, Vector2 desiredVelocity)
     {
@@ -117,7 +98,6 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     {
         float radius = KeepOutRadius();
 
-        // CircleCast starts outside the body, so it misses a wall we are already touching.
         Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, radius, obstacleLayers);
         for (int i = 0; i < overlaps.Length; i++)
         {
@@ -162,10 +142,6 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         return alongWall.normalized * maxAvoidForce + pushOut;
     }
 
-    // -------------------------------------------------------------------------
-    // Geometry & wall helpers
-    // -------------------------------------------------------------------------
-
     float BodyRadius()
     {
         if (body == null)
@@ -194,8 +170,19 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // Scene view: yellow = look-ahead, green = wall normal, magenta = force, red = keep-out
+    // Gizmos — yellow = look-ahead, green = wall normal, magenta = force, red = keep-out
     // -------------------------------------------------------------------------
+
+    [SerializeField] bool showGizmos = true;
+
+    bool gizmoHasSample;
+    Vector2 gizmoPosition;
+    Vector2 gizmoDirection;
+    float gizmoLookDistance;
+    bool gizmoFoundWall;
+    Vector2 gizmoWallNormal;
+    Vector2 gizmoWallContact;
+    Vector2 gizmoForce;
 
     void StoreGizmoSample(
         Vector2 position,
@@ -225,34 +212,34 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         float radius = KeepOutRadius();
 
         Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.85f);
-        DrawCircle(origin, radius);
+        DrawGizmoCircle(origin, radius);
 
         if (!gizmoHasSample || gizmoDirection.sqrMagnitude < SteeringMath.Epsilon)
         {
             Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.35f);
-            DrawCircle(origin, maxSeeAhead);
-            DrawKeepOutNormals(origin);
+            DrawGizmoCircle(origin, maxSeeAhead);
+            DrawGizmoKeepOutNormals(origin);
             return;
         }
 
         Vector2 ahead = origin + gizmoDirection * gizmoLookDistance;
         Gizmos.DrawLine(origin, ahead);
-        DrawCircle(ahead, radius);
+        DrawGizmoCircle(ahead, radius);
 
         if (gizmoFoundWall)
         {
             Gizmos.color = new Color(0.2f, 0.95f, 0.35f);
-            DrawArrow(gizmoWallContact, gizmoWallNormal);
+            DrawGizmoArrow(gizmoWallContact, gizmoWallNormal);
         }
 
         Gizmos.color = new Color(0.9f, 0.35f, 1f);
         if (gizmoForce.sqrMagnitude > SteeringMath.Epsilon)
-            DrawArrow(origin, gizmoForce.normalized * 1.5f);
+            DrawGizmoArrow(origin, gizmoForce.normalized * 1.5f);
 
-        DrawKeepOutNormals(origin);
+        DrawGizmoKeepOutNormals(origin);
     }
 
-    void DrawKeepOutNormals(Vector2 origin)
+    void DrawGizmoKeepOutNormals(Vector2 origin)
     {
         Collider2D[] overlaps = Physics2D.OverlapCircleAll(origin, KeepOutRadius(), obstacleLayers);
         Gizmos.color = new Color(1f, 0.3f, 0.3f);
@@ -263,11 +250,11 @@ public class SteeringCollisionAvoidance : MonoBehaviour
                 continue;
 
             Vector2 closest = overlaps[i].ClosestPoint(origin);
-            DrawArrow(closest, outOfWall * 0.75f);
+            DrawGizmoArrow(closest, outOfWall * 0.75f);
         }
     }
 
-    static void DrawArrow(Vector2 from, Vector2 vector)
+    static void DrawGizmoArrow(Vector2 from, Vector2 vector)
     {
         if (vector.sqrMagnitude < SteeringMath.Epsilon)
             return;
@@ -283,7 +270,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         Gizmos.DrawLine(tip, back - wing);
     }
 
-    static void DrawCircle(Vector2 center, float radius)
+    static void DrawGizmoCircle(Vector2 center, float radius)
     {
         if (radius <= 0f)
             return;

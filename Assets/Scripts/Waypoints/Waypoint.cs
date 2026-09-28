@@ -2,18 +2,21 @@ using UnityEngine;
 
 /// <summary>
 /// A single patrol node in 2D. Position is this transform.
-/// Link other waypoints in <see cref="connections"/> to draw edges in the Scene view.
+/// Link other waypoints in <see cref="connections"/> to define the patrol graph.
 /// </summary>
 public class Waypoint : MonoBehaviour
 {
     [SerializeField] Waypoint[] connections;
-
-    [Header("Gizmos")]
-    [SerializeField] Color nodeColor = new Color(0.25f, 0.85f, 1f, 0.95f);
-    [SerializeField] Color lineColor = new Color(0.25f, 0.85f, 1f, 0.65f);
     [SerializeField] float nodeRadius = 0.2f;
 
     public Vector2 Position => transform.position;
+
+    // -------------------------------------------------------------------------
+    // Gizmos
+    // -------------------------------------------------------------------------
+
+    [SerializeField] Color nodeColor = new Color(0.25f, 0.85f, 1f, 0.95f);
+    [SerializeField] Color lineColor = new Color(0.25f, 0.85f, 1f, 0.65f);
 
     void OnDrawGizmos()
     {

@@ -45,4 +45,20 @@ public class WaypointPatrolChase : MonoBehaviour
         if (_wait >= returnToPatrolDelay)
             _patrol.SetPatrolActive(true);
     }
+
+    // -------------------------------------------------------------------------
+    // Gizmos
+    // -------------------------------------------------------------------------
+
+    [SerializeField] bool showDetectionGizmo = true;
+    [SerializeField] Color detectionGizmoColor = new Color(1f, 0.35f, 0.35f, 0.35f);
+
+    void OnDrawGizmosSelected()
+    {
+        if (!showDetectionGizmo)
+            return;
+
+        Gizmos.color = detectionGizmoColor;
+        Gizmos.DrawWireSphere(transform.position, detectionRadius);
+    }
 }
