@@ -69,9 +69,16 @@ public class SteeringEnemy : MonoBehaviour
     {
         _moveToPoint = true;
         _point = point;
+        if (_avoidance != null)
+            _avoidance.Clear();
     }
 
-    public void ClearMoveTarget() => _moveToPoint = false;
+    public void ClearMoveTarget()
+    {
+        _moveToPoint = false;
+        if (_avoidance != null)
+            _avoidance.Clear();
+    }
 
     void Awake()
     {

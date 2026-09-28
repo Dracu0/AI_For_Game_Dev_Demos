@@ -20,7 +20,7 @@ public static class SteeringMath
     }
 
     /// <summary>
-    /// steering = clamp(desired - velocity + avoidance, maxForce)
+    /// steering = clamp(desired - velocity, maxForce)
     /// velocity = clamp(velocity + steering * dt, maxSpeed)
     /// </summary>
     public static Vector2 Steer(
@@ -34,13 +34,10 @@ public static class SteeringMath
         Vector2 current = rb.linearVelocity;
         float deltaTime = Time.fixedDeltaTime;
 
-        Vector2 avoidanceForce = Vector2.zero;
         if (avoidance != null)
-            desiredVelocity = avoidance.ResolveDesired(position, current, desiredVelocity, maxSpeed, out avoidanceForce);
+            desiredVelocity = avoidance.ResolveDesired(position, desiredVelocity);
 
-        Vector2 steering = Vector2.ClampMagnitude(
-            desiredVelocity - current + avoidanceForce,
-            maxForce);
+        Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - current, maxForce);
         Vector2 velocity = current + steering * deltaTime;
 
         if (avoidance != null)

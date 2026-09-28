@@ -1,68 +1,57 @@
 using UnityEngine;
 
 /// <summary>
-/// Looks ahead for a wall. Head-on, it commits to one side and slides.
-/// Otherwise it pushes away from the wall.
+/// Casts one feeler toward the goal. If it hits a wall, steer toward the goal and the open side.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(CircleCollider2D))]
 public class SteeringCollisionAvoidance : MonoBehaviour
 {
-    const float HeadOn = 0.7f;
-
     [SerializeField] LayerMask obstacleLayers = 1 << 3;
     [SerializeField] float maxSeeAhead = 3f;
-    [SerializeField] float maxAvoidForce = 12f;
     [SerializeField] float obstaclePadding = 0.4f;
 
     CircleCollider2D _body;
-    Vector2 _slideDirection;
+    int _side;
 
-    public Vector2 ResolveDesired(
-        Vector2 position,
-        Vector2 velocity,
-        Vector2 desiredVelocity,
-        float maxSpeed,
-        out Vector2 extraForce)
+    public void Clear() => _side = 0;
+
+    public Vector2 ResolveDesired(Vector2 position, Vector2 desiredVelocity)
     {
-        extraForce = Vector2.zero;
-
-        Vector2 lookDirection = LookDirection(velocity, desiredVelocity);
-        float lookDistance = LookDistance(velocity, desiredVelocity, maxSpeed);
-        Vector2 resolved = desiredVelocity;
-        bool sliding = false;
-
-        if (desiredVelocity.sqrMagnitude > SteeringMath.Epsilon)
+        if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
         {
-            Vector2 goalDir = desiredVelocity.normalized;
-            float speed = desiredVelocity.magnitude;
-            bool blocked = !GoalIsClear(position, goalDir, lookDistance);
-
-            if (blocked && TryFindWall(position, goalDir, lookDistance, desiredVelocity, out Vector2 wallNormal)
-                && (Vector2.Dot(goalDir, -wallNormal) >= HeadOn || _slideDirection != Vector2.zero))
-            {
-                resolved = SlideDirection(wallNormal, goalDir) * speed;
-                lookDirection = goalDir;
-                sliding = true;
-            }
-            else if (blocked && _slideDirection != Vector2.zero)
-            {
-                resolved = _slideDirection * speed;
-                lookDirection = goalDir;
-                sliding = true;
-            }
-            else if (!blocked)
-                _slideDirection = Vector2.zero;
+            Remember(Vector2.zero, 0f, desiredVelocity);
+            return desiredVelocity;
         }
 
-        if (!sliding
-            && lookDirection != Vector2.zero
-            && TryFindWall(position, lookDirection, lookDistance, desiredVelocity, out Vector2 normal))
-            extraForce = normal * maxAvoidForce;
+        Vector2 ahead = desiredVelocity.normalized;
+        float speed = desiredVelocity.magnitude;
 
-        Remember(lookDirection, lookDistance, resolved);
+        if (IsClear(position, ahead))
+        {
+            _side = 0;
+            Remember(ahead, maxSeeAhead, desiredVelocity);
+            return desiredVelocity;
+        }
+
+        Vector2 left = Side(ahead, 1);
+        Vector2 right = Side(ahead, -1);
+        bool leftClear = IsClear(position, left);
+        bool rightClear = IsClear(position, right);
+
+        if (leftClear && !rightClear)
+            _side = 1;
+        else if (rightClear && !leftClear)
+            _side = -1;
+        else if (_side == 0)
+            _side = (GetInstanceID() & 1) == 0 ? 1 : -1;
+
+        Vector2 resolved = (ahead + Side(ahead, _side)).normalized * speed;
+        Remember(resolved.normalized, maxSeeAhead, resolved);
         return resolved;
     }
+
+    static Vector2 Side(Vector2 ahead, int sign) => new Vector2(-ahead.y, ahead.x) * sign;
 
     public Vector2 PreventMovingIntoWalls(Vector2 position, Vector2 velocity)
     {
@@ -70,54 +59,6 @@ public class SteeringCollisionAvoidance : MonoBehaviour
             return velocity;
 
         Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, KeepOutRadius(), obstacleLayers);
-        for (int i = 0; i < overlaps.Length; i++)
-        {
-            if (!AwayFromWall(position, overlaps[i], out Vector2 away))
-                continue;
-
-            float pushingIn = Vector2.Dot(velocity, -away);
-            if (pushingIn > 0f)
-                velocity += away * pushingIn;
-        }
-
-        return velocity;
-    }
-
-    void Awake() => _body = GetComponent<CircleCollider2D>();
-
-    static Vector2 LookDirection(Vector2 velocity, Vector2 desiredVelocity)
-    {
-        Vector2 direction = velocity.sqrMagnitude > SteeringMath.Epsilon ? velocity : desiredVelocity;
-        return direction.sqrMagnitude < SteeringMath.Epsilon ? Vector2.zero : direction.normalized;
-    }
-
-    float LookDistance(Vector2 velocity, Vector2 desiredVelocity, float maxSpeed)
-    {
-        float distance = maxSpeed > SteeringMath.Epsilon
-            ? maxSeeAhead * Mathf.Clamp01(velocity.magnitude / maxSpeed)
-            : 0f;
-
-        if (desiredVelocity.sqrMagnitude > SteeringMath.Epsilon)
-            distance = Mathf.Max(distance, maxSeeAhead * 0.5f);
-
-        return distance;
-    }
-
-    bool TryFindWall(
-        Vector2 position,
-        Vector2 direction,
-        float lookDistance,
-        Vector2 desiredVelocity,
-        out Vector2 wallNormal)
-    {
-        wallNormal = Vector2.zero;
-        float radius = KeepOutRadius();
-        Vector2 goalDir = desiredVelocity.sqrMagnitude > SteeringMath.Epsilon
-            ? desiredVelocity.normalized
-            : direction;
-
-        float bestBlock = -1f;
-        Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, radius, obstacleLayers);
         for (int i = 0; i < overlaps.Length; i++)
         {
             Collider2D wall = overlaps[i];
@@ -128,62 +69,20 @@ public class SteeringCollisionAvoidance : MonoBehaviour
             if (away.sqrMagnitude < SteeringMath.Epsilon)
                 continue;
 
-            Vector2 normal = away.normalized;
-            float block = Vector2.Dot(goalDir, -normal);
-            if (block <= bestBlock)
-                continue;
-
-            bestBlock = block;
-            wallNormal = normal;
+            float pushingIn = Vector2.Dot(velocity, -away.normalized);
+            if (pushingIn > 0f)
+                velocity += away.normalized * pushingIn;
         }
 
-        if (wallNormal != Vector2.zero)
-            return true;
-
-        RaycastHit2D hit = Physics2D.CircleCast(position, radius, direction, lookDistance, obstacleLayers);
-        if (hit.collider == null || hit.collider == _body || hit.normal == Vector2.zero)
-            return false;
-
-        wallNormal = hit.normal.normalized;
-        return true;
+        return velocity;
     }
 
-    bool GoalIsClear(Vector2 position, Vector2 goalDir, float lookDistance)
-    {
-        if (goalDir == Vector2.zero || lookDistance <= 0f)
-            return true;
+    void Awake() => _body = GetComponent<CircleCollider2D>();
 
-        RaycastHit2D hit = Physics2D.CircleCast(position, KeepOutRadius(), goalDir, lookDistance, obstacleLayers);
+    bool IsClear(Vector2 position, Vector2 direction)
+    {
+        RaycastHit2D hit = Physics2D.CircleCast(position, KeepOutRadius(), direction, maxSeeAhead, obstacleLayers);
         return hit.collider == null || hit.collider == _body;
-    }
-
-    Vector2 SlideDirection(Vector2 wallNormal, Vector2 goalDir)
-    {
-        Vector2 tangent = new Vector2(-wallNormal.y, wallNormal.x);
-        if (_slideDirection != Vector2.zero)
-        {
-            if (Vector2.Dot(tangent, _slideDirection) < 0f)
-                tangent = -tangent;
-        }
-        else
-            tangent *= SideSign(wallNormal, goalDir);
-
-        _slideDirection = tangent.normalized;
-        return _slideDirection;
-    }
-
-    int SideSign(Vector2 wallNormal, Vector2 goalDir)
-    {
-        float cross = wallNormal.x * goalDir.y - wallNormal.y * goalDir.x;
-        if (Mathf.Abs(cross) > 0.05f)
-            return cross > 0f ? 1 : -1;
-
-        Vector2 tangent = new Vector2(-wallNormal.y, wallNormal.x);
-        float along = Vector2.Dot(tangent, goalDir);
-        if (Mathf.Abs(along) > 0.05f)
-            return along >= 0f ? 1 : -1;
-
-        return (GetInstanceID() & 1) == 0 ? 1 : -1;
     }
 
     float KeepOutRadius()
@@ -197,22 +96,8 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         return _body.radius * scale + Mathf.Max(0f, obstaclePadding);
     }
 
-    bool AwayFromWall(Vector2 position, Collider2D wall, out Vector2 away)
-    {
-        away = Vector2.zero;
-        if (wall == null || wall == _body)
-            return false;
-
-        Vector2 offset = position - wall.ClosestPoint(position);
-        if (offset.sqrMagnitude < SteeringMath.Epsilon)
-            return false;
-
-        away = offset.normalized;
-        return true;
-    }
-
     // -------------------------------------------------------------------------
-    // Gizmos — yellow = look-ahead cast, magenta = velocity used
+    // Gizmos — yellow = feeler, magenta = direction actually used
     // -------------------------------------------------------------------------
 
     [SerializeField] bool showGizmos = true;
@@ -240,8 +125,6 @@ public class SteeringCollisionAvoidance : MonoBehaviour
 
         bool current = SampleIsCurrent();
         Vector2 origin = transform.position;
-        Vector2 direction = current ? _sampleDirection : (Vector2)transform.right;
-        float distance = current ? _sampleDistance : maxSeeAhead;
         float radius = KeepOutRadius();
 
         Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.9f);
@@ -250,6 +133,8 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         if (!current && Application.isPlaying)
             return;
 
+        Vector2 direction = current ? _sampleDirection : (Vector2)transform.right;
+        float distance = current ? _sampleDistance : maxSeeAhead;
         if (direction != Vector2.zero && distance > 0f)
         {
             Vector2 ahead = origin + direction.normalized * distance;
