@@ -93,7 +93,7 @@ public class WaypointPatrol : MonoBehaviour
         if (current == null)
             return;
 
-        Vector3 origin = Application.isPlaying && _rb != null ? (Vector3)_rb.position : transform.position;
+        Vector3 origin = transform.position;
         Gizmos.color = new Color(0.3f, 1f, 0.45f, 0.9f);
         Gizmos.DrawLine(origin, current.Position);
         Gizmos.DrawWireSphere(current.Position, arriveDistance);

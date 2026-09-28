@@ -60,7 +60,7 @@ public class SteeringCollisionAvoidance : MonoBehaviour
             && TryFindWall(position, lookDirection, lookDistance, desiredVelocity, out Vector2 normal))
             extraForce = normal * maxAvoidForce;
 
-        Remember(position, lookDirection, lookDistance, resolved);
+        Remember(lookDirection, lookDistance, resolved);
         return resolved;
     }
 
@@ -217,41 +217,47 @@ public class SteeringCollisionAvoidance : MonoBehaviour
 
     [SerializeField] bool showGizmos = true;
 
-    bool _hasSample;
-    Vector2 _samplePosition;
+    float _sampleTime = -1f;
     Vector2 _sampleDirection;
     float _sampleDistance;
     Vector2 _sampleVelocity;
 
-    void Remember(Vector2 position, Vector2 direction, float distance, Vector2 velocity)
+    void Remember(Vector2 direction, float distance, Vector2 velocity)
     {
-        _hasSample = true;
-        _samplePosition = position;
+        _sampleTime = Time.time;
         _sampleDirection = direction;
         _sampleDistance = distance;
         _sampleVelocity = velocity;
     }
+
+    bool SampleIsCurrent() =>
+        Application.isPlaying && Time.time - _sampleTime <= Mathf.Max(Time.fixedDeltaTime * 2f, 0.05f);
 
     void OnDrawGizmos()
     {
         if (!showGizmos)
             return;
 
-        Vector2 origin = _hasSample ? _samplePosition : (Vector2)transform.position;
-        Vector2 direction = _hasSample ? _sampleDirection : (Vector2)transform.right;
-        float distance = _hasSample ? _sampleDistance : maxSeeAhead;
+        bool current = SampleIsCurrent();
+        Vector2 origin = transform.position;
+        Vector2 direction = current ? _sampleDirection : (Vector2)transform.right;
+        float distance = current ? _sampleDistance : maxSeeAhead;
+        float radius = KeepOutRadius();
 
         Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.9f);
-        Gizmos.DrawWireSphere(origin, KeepOutRadius());
+        Gizmos.DrawWireSphere(origin, radius);
+
+        if (!current && Application.isPlaying)
+            return;
 
         if (direction != Vector2.zero && distance > 0f)
         {
             Vector2 ahead = origin + direction.normalized * distance;
             Gizmos.DrawLine(origin, ahead);
-            Gizmos.DrawWireSphere(ahead, KeepOutRadius());
+            Gizmos.DrawWireSphere(ahead, radius);
         }
 
-        if (_sampleVelocity == Vector2.zero)
+        if (!current || _sampleVelocity == Vector2.zero)
             return;
 
         Gizmos.color = new Color(0.9f, 0.35f, 1f, 0.95f);

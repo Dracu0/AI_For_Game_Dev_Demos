@@ -96,6 +96,6 @@ public class WaypointPatrolChase : MonoBehaviour
 
         Gizmos.color = new Color(1f, 0.6f, 0.2f, 0.9f);
         Gizmos.DrawWireSphere(_lastSeen, arriveDistance);
-        Gizmos.DrawLine(_rb != null ? (Vector3)_rb.position : transform.position, _lastSeen);
+        Gizmos.DrawLine(transform.position, _lastSeen);
     }
 }

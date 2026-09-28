@@ -175,14 +175,12 @@ public class SteeringEnemy : MonoBehaviour
             ResizeCircles();
 
         Gizmos.color = new Color(1f, 1f, 1f, 0.9f);
-        Gizmos.DrawWireSphere(CircleCenter(rangeCircle), range);
+        Gizmos.DrawWireSphere(transform.position, range);
 
         if (slowRadiusCircle == null || slowRadiusCircle == rangeCircle)
             return;
 
         Gizmos.color = new Color(0.5f, 1f, 0.5f, 0.9f);
-        Gizmos.DrawWireSphere(CircleCenter(slowRadiusCircle), slowRadius);
+        Gizmos.DrawWireSphere(transform.position, slowRadius);
     }
-
-    Vector3 CircleCenter(Transform circle) => circle != null ? circle.position : transform.position;
 }
