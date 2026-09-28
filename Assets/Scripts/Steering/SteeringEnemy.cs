@@ -41,16 +41,21 @@ public class SteeringEnemy : MonoBehaviour
     Rigidbody2D _playerRb;
     SteeringCollisionAvoidance _avoidance;
     bool _steeringActive = true;
+    bool _bypassSteeringRange;
 
     public Transform Player => player;
     public bool IsSteeringActive => _steeringActive;
 
-    public void SetSteeringActive(bool active)
+    /// <param name="bypassRangeLimit">
+    /// When true, chase logic can pursue anywhere inside detection (not capped by <see cref="range"/>).
+    /// </param>
+    public void SetSteeringActive(bool active, bool bypassRangeLimit = false)
     {
-        if (_steeringActive == active)
+        if (_steeringActive == active && _bypassSteeringRange == bypassRangeLimit)
             return;
 
         _steeringActive = active;
+        _bypassSteeringRange = active && bypassRangeLimit;
         EnsureRigidbody();
         if (_rb == null)
             return;
@@ -58,7 +63,10 @@ public class SteeringEnemy : MonoBehaviour
         if (active)
             _rb.position = transform.position;
         else
+        {
+            _bypassSteeringRange = false;
             SteeringMath.Stop(_rb);
+        }
     }
 
     public void Bind(Transform target, SteeringMode steeringMode)
@@ -105,7 +113,7 @@ public class SteeringEnemy : MonoBehaviour
         Vector2 from = _rb.position;
         Vector2 to = player.position;
 
-        if (SteeringMath.IsOutOfRange(from, to, range))
+        if (!_bypassSteeringRange && SteeringMath.IsOutOfRange(from, to, range))
         {
             desired = default;
             return false;
