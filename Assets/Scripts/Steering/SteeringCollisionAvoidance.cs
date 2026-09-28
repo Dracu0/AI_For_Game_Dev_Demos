@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Casts one feeler toward the goal. If it hits a wall, steer toward the goal and the open side.
+/// Goes straight at the goal. Near a wall, it slides toward the nearer end instead of arcing early.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(CircleCollider2D))]
@@ -12,9 +12,9 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     [SerializeField] float obstaclePadding = 0.4f;
 
     CircleCollider2D _body;
-    int _side;
+    Vector2 _slide;
 
-    public void Clear() => _side = 0;
+    public void Clear() => _slide = Vector2.zero;
 
     public Vector2 ResolveDesired(Vector2 position, Vector2 desiredVelocity)
     {
@@ -26,32 +26,30 @@ public class SteeringCollisionAvoidance : MonoBehaviour
 
         Vector2 ahead = desiredVelocity.normalized;
         float speed = desiredVelocity.magnitude;
+        RaycastHit2D hit = Physics2D.CircleCast(position, KeepOutRadius(), ahead, maxSeeAhead, obstacleLayers);
 
-        if (IsClear(position, ahead))
+        if (hit.collider == null || hit.collider == _body || hit.normal.sqrMagnitude < SteeringMath.Epsilon)
         {
-            _side = 0;
+            _slide = Vector2.zero;
             Remember(ahead, maxSeeAhead, desiredVelocity);
             return desiredVelocity;
         }
 
-        Vector2 left = Side(ahead, 1);
-        Vector2 right = Side(ahead, -1);
-        bool leftClear = IsClear(position, left);
-        bool rightClear = IsClear(position, right);
+        float closeness = 1f - Mathf.Clamp01(hit.distance / maxSeeAhead);
+        Vector2 tangent = new Vector2(-hit.normal.y, hit.normal.x);
+        float towardGoal = Vector2.Dot(tangent, ahead);
 
-        if (leftClear && !rightClear)
-            _side = 1;
-        else if (rightClear && !leftClear)
-            _side = -1;
-        else if (_side == 0)
-            _side = (GetInstanceID() & 1) == 0 ? 1 : -1;
+        if (Mathf.Abs(towardGoal) > 0.2f)
+            _slide = towardGoal >= 0f ? tangent : -tangent;
+        else if (_slide == Vector2.zero)
+            _slide = tangent * ((GetInstanceID() & 1) == 0 ? 1 : -1);
+        else if (Vector2.Dot(tangent, _slide) < 0f)
+            _slide = -tangent;
 
-        Vector2 resolved = (ahead + Side(ahead, _side)).normalized * speed;
-        Remember(resolved.normalized, maxSeeAhead, resolved);
+        Vector2 resolved = Vector2.Lerp(ahead, _slide.normalized, closeness * closeness).normalized * speed;
+        Remember(ahead, maxSeeAhead, resolved);
         return resolved;
     }
-
-    static Vector2 Side(Vector2 ahead, int sign) => new Vector2(-ahead.y, ahead.x) * sign;
 
     public Vector2 PreventMovingIntoWalls(Vector2 position, Vector2 velocity)
     {
@@ -78,12 +76,6 @@ public class SteeringCollisionAvoidance : MonoBehaviour
     }
 
     void Awake() => _body = GetComponent<CircleCollider2D>();
-
-    bool IsClear(Vector2 position, Vector2 direction)
-    {
-        RaycastHit2D hit = Physics2D.CircleCast(position, KeepOutRadius(), direction, maxSeeAhead, obstacleLayers);
-        return hit.collider == null || hit.collider == _body;
-    }
 
     float KeepOutRadius()
     {
