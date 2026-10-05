@@ -36,7 +36,8 @@ public class SteeringEnemy : MonoBehaviour
     [SerializeField] float slowRadius = 3f;
 
     [Header("Pursue / Evade only")]
-    [SerializeField] float targetMaxSpeed = 5f;
+    [Tooltip("Upper limit (seconds) on how far ahead the target's movement is predicted.")]
+    [SerializeField] float maxPredictionTime = 1.5f;
 
     Rigidbody2D _rb;
     Rigidbody2D _playerRb;
@@ -47,6 +48,16 @@ public class SteeringEnemy : MonoBehaviour
 
     public Transform Player => player;
     public float Range => range;
+
+    Rigidbody2D PlayerBody
+    {
+        get
+        {
+            if (_playerRb == null && player != null)
+                _playerRb = player.GetComponent<Rigidbody2D>();
+            return _playerRb;
+        }
+    }
 
     public void SetSteeringActive(bool active)
     {
@@ -85,8 +96,6 @@ public class SteeringEnemy : MonoBehaviour
         _rb = GetComponent<Rigidbody2D>();
         _avoidance = GetComponent<SteeringCollisionAvoidance>();
         SteeringMath.SetupBody(_rb);
-        if (player != null)
-            _playerRb = player.GetComponent<Rigidbody2D>();
         ResizeCircles();
     }
 
@@ -106,32 +115,55 @@ public class SteeringEnemy : MonoBehaviour
         if (!_moveToPoint && (player == null || Vector2.Distance(_rb.position, player.position) > range))
         {
             SteeringMath.Stop(_rb);
+            if (_avoidance != null)
+                _avoidance.Clear();
             return;
         }
 
-        _rb.linearVelocity = SteeringMath.Steer(_rb, DesiredVelocity(), maxForce, maxSpeed, _avoidance);
+        Vector2 desired = DesiredVelocity(out float goalDistance);
+        _rb.linearVelocity = SteeringMath.Steer(_rb, desired, maxForce, maxSpeed, _avoidance, goalDistance);
     }
 
-    Vector2 DesiredVelocity()
+    /// <summary>
+    /// goalDistance is how far the thing we are heading TOWARD is (infinity when fleeing),
+    /// so avoidance doesn't react to walls behind the goal.
+    /// </summary>
+    Vector2 DesiredVelocity(out float goalDistance)
     {
-        if (_moveToPoint)
-            return SteeringMath.SeekVelocity(_rb.position, _point, maxSpeed);
-
         Vector2 from = _rb.position;
+
+        if (_moveToPoint)
+        {
+            goalDistance = Vector2.Distance(from, _point);
+            return SteeringMath.SeekVelocity(from, _point, maxSpeed);
+        }
+
         Vector2 to = player.position;
+        goalDistance = float.PositiveInfinity;
 
         switch (mode)
         {
             case SteeringMode.Seek:
+                goalDistance = Vector2.Distance(from, to);
                 return SteeringMath.SeekVelocity(from, to, maxSpeed);
+
             case SteeringMode.Flee:
                 return SteeringMath.FleeVelocity(from, to, maxSpeed);
+
             case SteeringMode.Arrival:
+                goalDistance = Vector2.Distance(from, to);
                 return SteeringMath.ArrivalVelocity(from, to, maxSpeed, slowRadius);
+
             case SteeringMode.Pursue:
-                return SteeringMath.SeekVelocity(from, PredictedPlayerPosition(), maxSpeed);
+            {
+                Vector2 predicted = PredictedPlayerPosition();
+                goalDistance = Vector2.Distance(from, predicted);
+                return SteeringMath.SeekVelocity(from, predicted, maxSpeed);
+            }
+
             case SteeringMode.Evade:
                 return SteeringMath.FleeVelocity(from, PredictedPlayerPosition(), maxSpeed);
+
             default:
                 return Vector2.zero;
         }
@@ -139,8 +171,9 @@ public class SteeringEnemy : MonoBehaviour
 
     Vector2 PredictedPlayerPosition()
     {
-        Vector2 playerVelocity = _playerRb != null ? _playerRb.linearVelocity : Vector2.zero;
-        return SteeringMath.PredictPosition(_rb.position, player.position, playerVelocity, targetMaxSpeed);
+        Rigidbody2D body = PlayerBody;
+        Vector2 playerVelocity = body != null ? body.linearVelocity : Vector2.zero;
+        return SteeringMath.PredictPosition(_rb.position, player.position, playerVelocity, maxSpeed, maxPredictionTime);
     }
 
     void ResizeCircles()

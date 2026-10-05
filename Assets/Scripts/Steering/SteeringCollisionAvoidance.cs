@@ -1,53 +1,107 @@
 using UnityEngine;
 
 /// <summary>
-/// Goes straight at the goal. Near a wall, it slides toward the nearer end instead of arcing early.
+/// Goes straight at the goal. When a wall blocks the way it commits to a side
+/// (the side with the nearest opening), slides along the wall, and only lets go
+/// once the way to the goal has been clear for a short moment.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(CircleCollider2D))]
 public class SteeringCollisionAvoidance : MonoBehaviour
 {
+    [Header("Detection")]
     [SerializeField] LayerMask obstacleLayers = 1 << 3;
     [SerializeField] float maxSeeAhead = 3f;
     [SerializeField] float obstaclePadding = 0.4f;
 
+    [Header("Side selection")]
+    [Tooltip("Spacing of the sideways probes used to find the nearest opening.")]
+    [SerializeField] float probeStep = 0.5f;
+    [Tooltip("How many probes per side (reach = step * count).")]
+    [SerializeField, Min(1)] int probeCount = 16;
+    [Tooltip("Seconds the way must stay clear before the committed side is forgotten.")]
+    [SerializeField] float commitHoldTime = 0.35f;
+    [Tooltip("Minimum seconds between dead-end side flips.")]
+    [SerializeField] float flipCooldown = 0.5f;
+
     CircleCollider2D _body;
-    Vector2 _slide;
+    Vector2 _slide;                 // committed slide direction (unit). Zero = not committed.
+    float _clearTime;               // time since the way ahead was last blocked
+    float _lastFlipTime = -999f;
+    readonly Collider2D[] _overlaps = new Collider2D[8];
 
-    public void Clear() => _slide = Vector2.zero;
+    public void Clear()
+    {
+        _slide = Vector2.zero;
+        _clearTime = 0f;
+    }
 
-    public Vector2 ResolveDesired(Vector2 position, Vector2 desiredVelocity)
+    /// <summary>
+    /// maxDistance = how far away the goal is. Walls behind the goal are ignored.
+    /// Pass infinity for flee-style behaviours.
+    /// </summary>
+    public Vector2 ResolveDesired(Vector2 position, Vector2 desiredVelocity, float maxDistance = float.PositiveInfinity)
     {
         if (desiredVelocity.sqrMagnitude < SteeringMath.Epsilon)
         {
+            Clear();
             Remember(Vector2.zero, 0f, desiredVelocity);
             return desiredVelocity;
         }
 
         Vector2 ahead = desiredVelocity.normalized;
         float speed = desiredVelocity.magnitude;
-        RaycastHit2D hit = Physics2D.CircleCast(position, KeepOutRadius(), ahead, maxSeeAhead, obstacleLayers);
+        float radius = KeepOutRadius();
+        float seeAhead = Mathf.Min(maxSeeAhead, Mathf.Max(maxDistance, 0f));
 
-        if (hit.collider == null || hit.collider == _body || hit.normal.sqrMagnitude < SteeringMath.Epsilon)
+        RaycastHit2D hit = Physics2D.CircleCast(position, radius, ahead, seeAhead, obstacleLayers);
+
+        if (!IsObstacle(hit))
         {
-            _slide = Vector2.zero;
-            Remember(ahead, maxSeeAhead, desiredVelocity);
+            // Keep the committed side for a moment so we don't flip-flop around corners.
+            _clearTime += Time.fixedDeltaTime;
+            if (_clearTime > commitHoldTime)
+                _slide = Vector2.zero;
+
+            Remember(ahead, seeAhead, desiredVelocity);
             return desiredVelocity;
         }
 
+        _clearTime = 0f;
+
+        Vector2 normal = WallNormal(hit, position, ahead);
+        Vector2 tangent = new Vector2(-normal.y, normal.x);
+
+        if (_slide.sqrMagnitude < SteeringMath.Epsilon)
+        {
+            // First contact: pick the side with the nearest opening and stick with it.
+            _slide = ChooseSlide(position, ahead, tangent, radius);
+        }
+        else
+        {
+            // Already committed: follow the wall's shape, never change direction because
+            // the goal happens to be slightly to the other side.
+            if (Vector2.Dot(tangent, _slide) < 0f)
+                tangent = -tangent;
+            _slide = tangent;
+
+            // Dead end (inner corner)? Turn around, but not every frame.
+            if (Time.time - _lastFlipTime > flipCooldown && BlockedAlong(position, _slide, radius))
+            {
+                _slide = -_slide;
+                _lastFlipTime = Time.time;
+            }
+        }
+
         float closeness = 1f - Mathf.Clamp01(hit.distance / maxSeeAhead);
-        Vector2 tangent = new Vector2(-hit.normal.y, hit.normal.x);
-        float towardGoal = Vector2.Dot(tangent, ahead);
+        float weight = closeness * closeness;
 
-        if (Mathf.Abs(towardGoal) > 0.2f)
-            _slide = towardGoal >= 0f ? tangent : -tangent;
-        else if (_slide == Vector2.zero)
-            _slide = tangent * ((GetInstanceID() & 1) == 0 ? 1 : -1);
-        else if (Vector2.Dot(tangent, _slide) < 0f)
-            _slide = -tangent;
+        Vector2 blended = Vector2.Lerp(ahead, _slide, weight);
+        if (blended.sqrMagnitude < 0.01f)
+            blended = _slide;
 
-        Vector2 resolved = Vector2.Lerp(ahead, _slide.normalized, closeness * closeness).normalized * speed;
-        Remember(ahead, maxSeeAhead, resolved);
+        Vector2 resolved = blended.normalized * speed;
+        Remember(ahead, seeAhead, resolved);
         return resolved;
     }
 
@@ -56,26 +110,110 @@ public class SteeringCollisionAvoidance : MonoBehaviour
         if (velocity.sqrMagnitude < SteeringMath.Epsilon)
             return velocity;
 
-        Collider2D[] overlaps = Physics2D.OverlapCircleAll(position, KeepOutRadius(), obstacleLayers);
-        for (int i = 0; i < overlaps.Length; i++)
+        ContactFilter2D filter = new ContactFilter2D();
+        filter.NoFilter();
+        filter.SetLayerMask(obstacleLayers);
+
+        int count = Physics2D.OverlapCircle(position, KeepOutRadius(), filter, _overlaps);
+        for (int i = 0; i < count; i++)
         {
-            Collider2D wall = overlaps[i];
+            Collider2D wall = _overlaps[i];
             if (wall == null || wall == _body)
                 continue;
 
             Vector2 away = position - wall.ClosestPoint(position);
             if (away.sqrMagnitude < SteeringMath.Epsilon)
+                away = position - (Vector2)wall.bounds.center; // we are inside it: push out from its centre
+            if (away.sqrMagnitude < SteeringMath.Epsilon)
                 continue;
 
-            float pushingIn = Vector2.Dot(velocity, -away.normalized);
+            Vector2 n = away.normalized;
+            float pushingIn = -Vector2.Dot(velocity, n);
             if (pushingIn > 0f)
-                velocity += away.normalized * pushingIn;
+                velocity += n * pushingIn;
         }
 
         return velocity;
     }
 
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    bool IsObstacle(RaycastHit2D hit) => hit.collider != null && hit.collider != _body;
+
+    /// <summary>
+    /// When the cast starts touching/overlapping the wall (exactly what happens once
+    /// PreventMovingIntoWalls has stopped us), Unity reports normal = -direction and
+    /// distance 0. That is what made the enemy freeze head-on against walls, so in that
+    /// case we rebuild the normal from the closest point on the collider instead.
+    /// </summary>
+    Vector2 WallNormal(RaycastHit2D hit, Vector2 position, Vector2 ahead)
+    {
+        if (hit.distance > 0.001f && hit.normal.sqrMagnitude > SteeringMath.Epsilon)
+            return hit.normal.normalized;
+
+        Vector2 away = position - hit.collider.ClosestPoint(position);
+        if (away.sqrMagnitude > SteeringMath.Epsilon)
+            return away.normalized;
+
+        return -ahead;
+    }
+
+    /// <summary>Picks the tangent direction that leads to the nearest opening.</summary>
+    Vector2 ChooseSlide(Vector2 position, Vector2 ahead, Vector2 tangent, float radius)
+    {
+        float plus = DistanceToOpening(position, ahead, tangent, radius);
+        float minus = DistanceToOpening(position, ahead, -tangent, radius);
+
+        bool pickPlus;
+        if ((float.IsInfinity(plus) && float.IsInfinity(minus)) || Mathf.Abs(plus - minus) < probeStep * 0.5f)
+        {
+            // No info / tie: prefer the side the goal leans toward, otherwise a stable per-enemy choice.
+            float towardGoal = Vector2.Dot(tangent, ahead);
+            pickPlus = Mathf.Abs(towardGoal) > 0.05f ? towardGoal > 0f : (GetInstanceID() & 1) == 0;
+        }
+        else
+        {
+            pickPlus = plus < minus;
+        }
+
+        return pickPlus ? tangent : -tangent;
+    }
+
+    /// <summary>
+    /// Walks sideways in small steps and returns how far we have to go before a
+    /// keep-out-sized cast toward the goal is no longer blocked. Infinity = none found.
+    /// </summary>
+    float DistanceToOpening(Vector2 position, Vector2 ahead, Vector2 side, float radius)
+    {
+        float reach = probeStep * probeCount;
+
+        // Can't probe through other walls to the side.
+        RaycastHit2D lateral = Physics2D.CircleCast(position, radius * 0.5f, side, reach, obstacleLayers);
+        if (IsObstacle(lateral))
+            reach = lateral.distance;
+
+        for (float offset = probeStep; offset <= reach; offset += probeStep)
+        {
+            RaycastHit2D h = Physics2D.CircleCast(position + side * offset, radius, ahead, maxSeeAhead, obstacleLayers);
+            if (!IsObstacle(h))
+                return offset;
+        }
+
+        return float.PositiveInfinity;
+    }
+
+    bool BlockedAlong(Vector2 position, Vector2 direction, float radius)
+    {
+        // Smaller circle so the wall we are sliding along doesn't count as blocking.
+        RaycastHit2D h = Physics2D.CircleCast(position, radius * 0.5f, direction, radius + 0.25f, obstacleLayers);
+        return IsObstacle(h);
+    }
+
     void Awake() => _body = GetComponent<CircleCollider2D>();
+
+    void OnDisable() => Clear();
 
     float KeepOutRadius()
     {

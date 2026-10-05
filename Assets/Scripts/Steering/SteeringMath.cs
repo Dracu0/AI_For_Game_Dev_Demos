@@ -22,20 +22,22 @@ public static class SteeringMath
     /// <summary>
     /// steering = clamp(desired - velocity, maxForce)
     /// velocity = clamp(velocity + steering * dt, maxSpeed)
+    /// goalDistance lets avoidance ignore walls that are behind the goal.
     /// </summary>
     public static Vector2 Steer(
         Rigidbody2D rb,
         Vector2 desiredVelocity,
         float maxForce,
         float maxSpeed,
-        SteeringCollisionAvoidance avoidance)
+        SteeringCollisionAvoidance avoidance,
+        float goalDistance = float.PositiveInfinity)
     {
         Vector2 position = rb.position;
         Vector2 current = rb.linearVelocity;
         float deltaTime = Time.fixedDeltaTime;
 
         if (avoidance != null)
-            desiredVelocity = avoidance.ResolveDesired(position, desiredVelocity);
+            desiredVelocity = avoidance.ResolveDesired(position, desiredVelocity, goalDistance);
 
         Vector2 steering = Vector2.ClampMagnitude(desiredVelocity - current, maxForce);
         Vector2 velocity = current + steering * deltaTime;
@@ -83,17 +85,22 @@ public static class SteeringMath
         return direction * maxSpeed;
     }
 
+    /// <summary>
+    /// Where the target will be by the time the AGENT can get there
+    /// (time = distance / agent speed, capped so far-away targets aren't over-led).
+    /// </summary>
     public static Vector2 PredictPosition(
         Vector2 agentPosition,
         Vector2 targetPosition,
         Vector2 targetVelocity,
-        float targetMaxSpeed)
+        float agentMaxSpeed,
+        float maxPredictionTime)
     {
-        if (targetMaxSpeed < Epsilon)
+        if (agentMaxSpeed < Epsilon)
             return targetPosition;
 
         float distance = Vector2.Distance(agentPosition, targetPosition);
-        float lookAheadTime = distance / targetMaxSpeed;
+        float lookAheadTime = Mathf.Min(distance / agentMaxSpeed, Mathf.Max(0f, maxPredictionTime));
         return targetPosition + targetVelocity * lookAheadTime;
     }
 }
