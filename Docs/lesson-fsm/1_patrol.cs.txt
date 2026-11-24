@@ -1,0 +1,35 @@
+using UnityEngine;
+
+public enum GuardState { Patrol, Chase, Search }
+
+public class GuardAI : GuardBody
+{
+    private GuardState _state;
+
+    private void Start() => Change(GuardState.Patrol);
+
+    private void FixedUpdate()
+    {
+        switch (_state)
+        {
+            case GuardState.Patrol:
+                if (MoveToward(PatrolPoint, walkSpeed))
+                    NextPatrolPoint();
+                break;
+        }
+    }
+
+    // Every state change goes through here, so entry actions live in one place.
+    private void Change(GuardState next)
+    {
+        _state = next;
+
+        switch (next)
+        {
+            case GuardState.Patrol:
+                Show("Patrol", Color.green);
+                GoToNearestPatrolPoint();
+                break;
+        }
+    }
+}

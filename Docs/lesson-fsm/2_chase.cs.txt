@@ -1,0 +1,48 @@
+using UnityEngine;
+
+public enum GuardState { Patrol, Chase, Search }
+
+public class GuardAI : GuardBody
+{
+    private GuardState _state;
+
+    private void Start() => Change(GuardState.Patrol);
+
+    private void FixedUpdate()
+    {
+        switch (_state)
+        {
+            case GuardState.Patrol:
+                if (DistanceToPlayer <= sightRadius)
+                    Change(GuardState.Chase);
+                else if (MoveToward(PatrolPoint, walkSpeed))
+                    NextPatrolPoint();
+                break;
+
+            case GuardState.Chase:
+                if (DistanceToPlayer > loseRadius)
+                    Change(GuardState.Patrol);          // Search will replace this target in step 3
+                else
+                    MoveToward(PlayerPosition, chaseSpeed);
+                break;
+        }
+    }
+
+    // Every state change goes through here, so entry actions live in one place.
+    private void Change(GuardState next)
+    {
+        _state = next;
+
+        switch (next)
+        {
+            case GuardState.Patrol:
+                Show("Patrol", Color.green);
+                GoToNearestPatrolPoint();
+                break;
+
+            case GuardState.Chase:
+                Show("Chase", Color.red);
+                break;
+        }
+    }
+}

@@ -1,0 +1,7 @@
+using UnityEngine;
+
+// Class starter: the guard has a body (GuardBody) but no brain yet. We build the FSM here, live.
+// The finished versions of every step are in Docs/lesson-fsm/ (as .txt files).
+public class GuardAI : GuardBody
+{
+}
